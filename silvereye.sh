@@ -28,7 +28,7 @@
 #
 # If you have a local mirror that you prefer to use, set up your yum
 # configuration to use it, and uncomment the line below.
-MIRROR="http://192.168.7.65/centos/5/os/x86_64/"
+#MIRROR="http://192.168.7.65/centos/5/os/x86_64/"
 
 # Modification below this point shouldn't be necessary
 
@@ -438,6 +438,17 @@ do
     scp -rp /root/.ssh root@${node}:/root/
     scp -rp /home/eucalyptus root@${node}:/home/ >>$LOGFILE 2>&1
     ssh root@${node} "chown -R eucalyptus:eucalyptus /home/eucalyptus" >>$LOGFILE 2>&1
+    grep -E '^VNET_MODE' /etc/eucalyptus/eucalyptus.conf > /tmp/eucalyptus_vnet_config.txt
+    grep -E '^VNET_SUBNET' /etc/eucalyptus/eucalyptus.conf >> /tmp/eucalyptus_vnet_config.txt
+    grep -E '^VNET_NETMASK' /etc/eucalyptus/eucalyptus.conf >> /tmp/eucalyptus_vnet_config.txt
+    grep -E '^VNET_DNS' /etc/eucalyptus/eucalyptus.conf >> /tmp/eucalyptus_vnet_config.txt
+    grep -E '^VNET_ADDRSPERNET' /etc/eucalyptus/eucalyptus.conf >> /tmp/eucalyptus_vnet_config.txt
+    grep -E '^VNET_PUBLICIPS' /etc/eucalyptus/eucalyptus.conf >> /tmp/eucalyptus_vnet_config.txt
+    scp /tmp/eucalyptus_vnet_config.txt root@${node}:/tmp/
+    ssh root@${node} "cat /tmp/eucalyptus_vnet_config.txt >> /etc/eucalyptus/eucalyptus.conf"
+    rm -f /tmp/eucalyptus_vnet_config.txt
+    ssh root@${node} "rm -f /tmp/eucalyptus_vnet_config.txt"
+    ssh root@${node} "service eucalyptus-nc restart"
     $EUCALYPTUS/usr/sbin/euca_conf --register-nodes $node |tee -a $LOGFILE
   fi
 done
