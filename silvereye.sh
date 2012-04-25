@@ -800,7 +800,14 @@ read -p "Would you like to install a graphical desktop on this Frontend server? 
   y|Y|yes|YES|Yes)
     echo "$(date)- Installing graphical desktop.  This may take a few minutes." |tee -a $LOGFILE
     echo ""
-    yum -y groupinstall 'GNOME Desktop Environment' 'X Window System'
+    case "$ELVERSION" in
+    "5")
+      yum -y groupinstall 'GNOME Desktop Environment' 'X Window System'
+      ;;
+    "6")
+      yum -y groupinstall 'X Window System' 'Desktop'
+      ;;
+    esac
     yum -y install firefox
     echo ""
     echo "In order to log in to the graphical desktop you must use a non-root user."
