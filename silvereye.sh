@@ -1346,7 +1346,9 @@ case "$ELVERSION" in
   ;;
 "6")
   sed -i -e 's/^network .*query$/network --activate/' ${BUILDDIR}/isolinux/ks/*.cfg
+  sed -i -e '/^dbus-python$/d' ${BUILDDIR}/isolinux/ks/*.cfg
   sed -i -e '/^kernel-xen$/d' ${BUILDDIR}/isolinux/ks/*.cfg
+  sed -i -e '/^libxml2-python$/d' ${BUILDDIR}/isolinux/ks/*.cfg
   sed -i -e '/^xen$/d' ${BUILDDIR}/isolinux/ks/*.cfg
   sed -i -e '/^-kernel$/d' ${BUILDDIR}/isolinux/ks/*.cfg
   ;;
