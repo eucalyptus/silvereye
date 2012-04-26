@@ -1383,8 +1383,8 @@ case "$EUCALYPTUSVERSION" in
   sed -i -e 's/EUCALYPTUSRELEASEPACKAGEREPLACEME/eucalyptus-release-enterprise/' ${BUILDDIR}/isolinux/ks/*.cfg
   # Fix Eucalyptus Enterprise download cert/keys
   sed -i -e "s#REPLACEMEENTERPRISECERT#echo \"`echo -e "${ENTERPRISECERT}" | sed ':a;N;$!ba;s/\n/NEWLINETAG/g'`\" > /etc/pki/tls/certs/eucalyptus-enterprise.crt#" ${BUILDDIR}/isolinux/ks/*.cfg
-  sed -i -e "s#REPLACEMEENTERPRISEPRIVATEKEY#echo \"`echo -e "${ENTERPRISEPRIVATEKEY}" | sed ':a;N;$!ba;s/\n/NEWLINETAG/g'`\" > /etc/pki/tls/certs/eucalyptus-enterprise.crt#" ${BUILDDIR}/isolinux/ks/*.cfg
-  sed -i -e "s#REPLACEMEEUCAGPGKEY#echo \"`echo -e "${EUCAGPGKEY}" | sed ':a;N;$!ba;s/\n/NEWLINETAG/g'`\" > /etc/pki/tls/certs/eucalyptus-enterprise.crt#" ${BUILDDIR}/isolinux/ks/*.cfg
+  sed -i -e "s#REPLACEMEENTERPRISEPRIVATEKEY#echo \"`echo -e "${ENTERPRISEPRIVATEKEY}" | sed ':a;N;$!ba;s/\n/NEWLINETAG/g'`\" > /etc/pki/tls/private/eucalyptus-enterprise.key#" ${BUILDDIR}/isolinux/ks/*.cfg
+  sed -i -e "s#REPLACEMEEUCAGPGKEY#echo \"`echo -e "${EUCAGPGKEY}" | sed ':a;N;$!ba;s/\n/NEWLINETAG/g'`\" > /etc/pki/rpm-gpg/eucalyptus-release-key.pub#" ${BUILDDIR}/isolinux/ks/*.cfg
   sed -i -e 's/NEWLINETAG/\n/g' ${BUILDDIR}/isolinux/ks/*.cfg
   ;;
 "3.1")
