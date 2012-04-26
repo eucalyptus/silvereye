@@ -905,6 +905,14 @@ euca2ools
 -kernel
 
 %post --log=/root/nc-ks-post.log
+# Workaround for grub not getting installed correctly on software RAID /boot partitions
+rpm -q kernel-xen > /dev/null
+if [ $? -eq 0 ] ; then
+  if mount | grep -E '^/dev/md.*/boot' > /dev/null ; then
+    grub-install $(mount | grep -E '^/dev/md.*/boot'|awk '{print $1}')
+  fi
+fi
+
 # Set the default Eucalyptus networking mode
 sed -i -e 's/^VNET_MODE=\"SYSTEM\"/VNET_MODE=\"MANAGED-NOVLAN"/' /etc/eucalyptus/eucalyptus.conf
 
