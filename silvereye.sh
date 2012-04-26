@@ -1698,7 +1698,7 @@ case "$ELVERSION" in
   sed -i -e 's/menu label Install system with ^basic video driver/menu label Install CentOS 6 with Eucalyptus ^Frontend/' isolinux.cfg
   sed -i -e 's%^  append initrd=initrd.img xdriver=vesa nomodeset%  append initrd=initrd.img ks=cdrom:/ks/frontend.cfg%' isolinux.cfg
   sed -i -e 's%^\(label rescue\)$%label minimal\n  menu label Install a ^minimal CentOS 6 without Eucalyptus\n  kernel vmlinuz\n  append initrd=initrd.img ks=cdrom:/ks/minimal.cfg\n\1%' isolinux.cfg
-  sed -i -e 's/menu title Welcome to CentOS .*$/menu title Welcome to Eucalyptus, powered by CentOS.  NOTE: It is recommended that you install and configure Node Controllers prior to installing and configuring your Frontend./' isolinux.cfg
+  sed -i -e 's/menu title Welcome to CentOS .*$/menu title Install NCs before installing Frontend./' isolinux.cfg
   ;;
 esac
 
