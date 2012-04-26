@@ -249,11 +249,13 @@ selinux --disabled
 %packages
 @Base
 @Core
+dbus-python
 elrepo-release
 epel-release
 EUCALYPTUSRELEASEPACKAGEREPLACEME
-ntp
 java-1.6.0-openjdk
+libxml2-python
+ntp
 system-config-network-tui
 unzip
 eucalyptus-cloud
@@ -269,6 +271,11 @@ sed -i -e 's/^VNET_MODE=\"SYSTEM\"/VNET_MODE=\"MANAGED-NOVLAN"/' /etc/eucalyptus
 # Disable Eucalyptus services before first boot
 /sbin/chkconfig eucalyptus-cloud off
 /sbin/chkconfig eucalyptus-cc off
+
+# Create Eucalyptus Enterprise download cert/keys
+REPLACEMEENTERPRISECERT
+REPLACEMEENTERPRISEPRIVATEKEY
+REPLACEMEEUCAGPGKEY
 
 # Create eucalyptus-frontend-config.sh script
 cat >> /usr/local/sbin/eucalyptus-frontend-config.sh <<"EOF"
@@ -401,6 +408,7 @@ for INTERFACE in `ls /etc/sysconfig/network-scripts/ | grep ifcfg | cut -d- -f2 
     y|Y|yes|YES|Yes)
       echo "$(date)- Enabling interface ${INTERFACE}." | tee -a $LOGFILE
       sed -i -e 's/ONBOOT=no/ONBOOT=yes/' /etc/sysconfig/network-scripts/ifcfg-${INTERFACE} | tee -a $LOGFILE
+      service network restart
       error_check
       ;;
     n|N|no|NO|No)
@@ -411,8 +419,6 @@ for INTERFACE in `ls /etc/sysconfig/network-scripts/ | grep ifcfg | cut -d- -f2 
     esac
   fi
 done
-
-service network restart
 
 # Ask user to reconfigure DNS if no DNS servers are detected
 NAMESERVERS=`grep ^nameserver /etc/resolv.conf | wc -l`
@@ -534,28 +540,28 @@ for FEIP in `ip addr show |grep inet |grep global|awk -F"[\t /]*" '{ print $3 }'
 done
 
 # Edit the default eucalyptus.conf, insert default values if no previous configuration is present
-if ! grep -E '(^VNET_MODE)' /etc/eucalyptus/eucalyptus.conf
+if ! grep -E '(^VNET_MODE)' /etc/eucalyptus/eucalyptus.conf > /dev/null
 then
   echo 'VNET_MODE="MANAGED-NOVLAN"' >> /etc/eucalyptus/eucalyptus.conf
 fi
-if ! grep -E '(^VNET_SUBNET)' /etc/eucalyptus/eucalyptus.conf
+if ! grep -E '(^VNET_SUBNET)' /etc/eucalyptus/eucalyptus.conf > /dev/null
 then
   echo 'VNET_SUBNET="192.168.0.0"' >> /etc/eucalyptus/eucalyptus.conf
 fi
-if ! grep -E '(^VNET_NETMASK)' /etc/eucalyptus/eucalyptus.conf
+if ! grep -E '(^VNET_NETMASK)' /etc/eucalyptus/eucalyptus.conf > /dev/null
 then
   echo 'VNET_NETMASK="255.255.255.0"' >> /etc/eucalyptus/eucalyptus.conf
 fi
-if ! grep -E '(^VNET_DNS)' /etc/eucalyptus/eucalyptus.conf
+if ! grep -E '(^VNET_DNS)' /etc/eucalyptus/eucalyptus.conf > /dev/null
 then
   PRIMARY_DNS=`grep nameserver /etc/resolv.conf | head -n1 | awk '{print $2}'`
   echo "VNET_DNS=\"$PRIMARY_DNS\"" >> /etc/eucalyptus/eucalyptus.conf
 fi
-if ! grep -E '(^VNET_ADDRSPERNET)' /etc/eucalyptus/eucalyptus.conf
+if ! grep -E '(^VNET_ADDRSPERNET)' /etc/eucalyptus/eucalyptus.conf > /dev/null
 then
   echo 'VNET_ADDRSPERNET="32"' >> /etc/eucalyptus/eucalyptus.conf
 fi
-if ! grep -E '(^VNET_PUBLICIPS)' /etc/eucalyptus/eucalyptus.conf
+if ! grep -E '(^VNET_PUBLICIPS)' /etc/eucalyptus/eucalyptus.conf > /dev/null
 then
   echo 'VNET_PUBLICIPS="###.###.###.###-###.###.###.###"' >> /etc/eucalyptus/eucalyptus.conf
 fi
@@ -881,10 +887,12 @@ selinux --disabled
 @Base
 @Core
 bridge-utils
+dbus-python
 elrepo-release
 epel-release
 EUCALYPTUSRELEASEPACKAGEREPLACEME
 kernel-xen
+libxml2-python
 ntp
 xen
 eucalyptus-nc
@@ -897,6 +905,11 @@ sed -i -e 's/^VNET_MODE=\"SYSTEM\"/VNET_MODE=\"MANAGED-NOVLAN"/' /etc/eucalyptus
 
 # Disable Eucalyptus services before first boot
 /sbin/chkconfig eucalyptus-nc off
+
+# Create Eucalyptus Enterprise download cert/keys
+REPLACEMEENTERPRISECERT
+REPLACEMEENTERPRISEPRIVATEKEY
+REPLACEMEEUCAGPGKEY
 
 # Create eucalyptus-nc-config.sh script
 cat >> /usr/local/sbin/eucalyptus-nc-config.sh <<"EOF"
@@ -999,7 +1012,6 @@ if [ $STATICIPS -lt 1 ] ; then
     y|Y|yes|YES|Yes)
       echo "$(date)- Configuring network settings." | tee -a $LOGFILE
       system-config-network-tui
-      service network restart
       error_check
       echo "$(date)- Reconfigured network settings." | tee -a $LOGFILE
       ;;
@@ -1011,6 +1023,28 @@ if [ $STATICIPS -lt 1 ] ; then
     esac
   done
 fi
+
+# Verify that each disabled interface is supposed to be that way
+for INTERFACE in `ls /etc/sysconfig/network-scripts/ | grep ifcfg | cut -d- -f2 | grep -v '^lo$'` ; do
+  if grep 'ONBOOT=no' /etc/sysconfig/network-scripts/ifcfg-${INTERFACE} > /dev/null ; then
+    echo ""
+    echo "Interface ${INTERFACE} is currently disabled."
+    read -p "Would you like to enable the interface ${INTERFACE}? " ENABLE_INTERFACE
+    case "$ENABLE_INTERFACE" in
+    y|Y|yes|YES|Yes)
+      echo "$(date)- Enabling interface ${INTERFACE}." | tee -a $LOGFILE
+      sed -i -e 's/ONBOOT=no/ONBOOT=yes/' /etc/sysconfig/network-scripts/ifcfg-${INTERFACE} | tee -a $LOGFILE
+      service network restart
+      error_check
+      ;;
+    n|N|no|NO|No)
+      echo "$(date)- Skipped enabling interface ${INTERFACE}." | tee -a $LOGFILE
+      ;;
+    *)
+      echo "Please answer either 'yes' or 'no'."
+    esac
+  fi
+done
 
 # Ask user to reconfigure DNS if no DNS servers are detected
 NAMESERVERS=`grep ^nameserver /etc/resolv.conf | wc -l`
@@ -1320,13 +1354,19 @@ esac
 case "$EUCALYPTUSVERSION" in
 "3.0")
   sed -i -e 's/EUCALYPTUSRELEASEPACKAGEREPLACEME/eucalyptus-release-enterprise/' ${BUILDDIR}/isolinux/ks/*.cfg
+  # Fix Eucalyptus Enterprise download cert/keys
+  sed -i -e "s#REPLACEMEENTERPRISECERT#echo \"`echo -e "${ENTERPRISECERT}" | sed ':a;N;$!ba;s/\n/NEWLINETAG/g'`\" > /etc/pki/tls/certs/eucalyptus-enterprise.crt#" ${BUILDDIR}/isolinux/ks/*.cfg
+  sed -i -e "s#REPLACEMEENTERPRISEPRIVATEKEY#echo \"`echo -e "${ENTERPRISEPRIVATEKEY}" | sed ':a;N;$!ba;s/\n/NEWLINETAG/g'`\" > /etc/pki/tls/certs/eucalyptus-enterprise.crt#" ${BUILDDIR}/isolinux/ks/*.cfg
+  sed -i -e "s#REPLACEMEEUCAGPGKEY#echo \"`echo -e "${EUCAGPGKEY}" | sed ':a;N;$!ba;s/\n/NEWLINETAG/g'`\" > /etc/pki/tls/certs/eucalyptus-enterprise.crt#" ${BUILDDIR}/isolinux/ks/*.cfg
+  sed -i -e 's/NEWLINETAG/\n/g' ${BUILDDIR}/isolinux/ks/*.cfg
   ;;
 "3.1")
   sed -i -e 's/EUCALYPTUSRELEASEPACKAGEREPLACEME/eucalyptus-nightly-release/' ${BUILDDIR}/isolinux/ks/*.cfg
+  sed -i -e '/REPLACEMEENTERPRISECERT/d' ${BUILDDIR}/isolinux/ks/*.cfg
+  sed -i -e '/REPLACEMEENTERPRISEPRIVATEKEY/d' ${BUILDDIR}/isolinux/ks/*.cfg
+  sed -i -e '/REPLACEMEEUCAGPGKEY/d' ${BUILDDIR}/isolinux/ks/*.cfg
   ;;
 esac
-EUCALYPTUSRELEASEPACKAGEREPLACEME
-
 
 # Install yum-utils if it isn't already installed
 install_package yum-utils
