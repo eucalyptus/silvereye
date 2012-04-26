@@ -380,7 +380,7 @@ if [ $STATICIPS -lt 1 ] ; then
   echo ""
   echo "It is recommended that you use static IP addressing for configuring the network interfaces on your Eucalyptus infrastructure servers."
   echo ""
-  while ! echo "$CONFIGURE_NETWORKING" | grep -iE '(^y$|^yes$|^n$|^no$)' ; do
+  while ! echo "$CONFIGURE_NETWORKING" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
     read -p "Would you like to reconfigure your network settings now? " CONFIGURE_NETWORKING
     case "$CONFIGURE_NETWORKING" in
     y|Y|yes|YES|Yes)
@@ -403,20 +403,22 @@ for INTERFACE in `ls /etc/sysconfig/network-scripts/ | grep ifcfg | cut -d- -f2 
   if grep 'ONBOOT=no' /etc/sysconfig/network-scripts/ifcfg-${INTERFACE} > /dev/null ; then
     echo ""
     echo "Interface ${INTERFACE} is currently disabled."
-    read -p "Would you like to enable the interface ${INTERFACE}? " ENABLE_INTERFACE
-    case "$ENABLE_INTERFACE" in
-    y|Y|yes|YES|Yes)
-      echo "$(date)- Enabling interface ${INTERFACE}." | tee -a $LOGFILE
-      sed -i -e 's/ONBOOT=no/ONBOOT=yes/' /etc/sysconfig/network-scripts/ifcfg-${INTERFACE} | tee -a $LOGFILE
-      service network restart
-      error_check
-      ;;
-    n|N|no|NO|No)
-      echo "$(date)- Skipped enabling interface ${INTERFACE}." | tee -a $LOGFILE
-      ;;
-    *)
-      echo "Please answer either 'yes' or 'no'."
-    esac
+    while ! echo "$ENABLE_INTERFACE" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
+      read -p "Would you like to enable the interface ${INTERFACE}? " ENABLE_INTERFACE
+      case "$ENABLE_INTERFACE" in
+      y|Y|yes|YES|Yes)
+        echo "$(date)- Enabling interface ${INTERFACE}." | tee -a $LOGFILE
+        sed -i -e 's/ONBOOT=no/ONBOOT=yes/' /etc/sysconfig/network-scripts/ifcfg-${INTERFACE} | tee -a $LOGFILE
+        service network restart
+        error_check
+        ;;
+      n|N|no|NO|No)
+        echo "$(date)- Skipped enabling interface ${INTERFACE}." | tee -a $LOGFILE
+        ;;
+      *)
+        echo "Please answer either 'yes' or 'no'."
+      esac
+    done
   fi
 done
 
@@ -426,7 +428,7 @@ if [ $NAMESERVERS -lt 1 ] ; then
   echo ""
   echo "It looks like you do not have DNS resolvers configured."
   echo ""
-  while ! echo "$CONFIGURE_DNS" | grep -iE '(^y$|^yes$|^n$|^no$)' ; do
+  while ! echo "$CONFIGURE_DNS" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
     read -p "Would you like to reconfigure your DNS settings now? " CONFIGURE_DNS
     case "$CONFIGURE_DNS" in
     y|Y|yes|YES|Yes)
@@ -490,9 +492,12 @@ fi
 # Set clock and enable ntpd service
 echo ""
 echo "It is important that time is synchronized across your Eucalyptus infrastructure."
+echo ""
 echo "The recommended way to ensure time remains synchronized is to enable the NTP service, which synchronizes time with Internet servers."
+echo ""
 echo "If your systems have Internet access, and you would like to use NTP to synchronize their clocks with the default pool.ntp.org servers, please answer yes."
-while ! echo "$ENABLE_NTP_SYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' ; do
+echo ""
+while ! echo "$ENABLE_NTP_SYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
   read -p "Enable NTP and synchronize clock? " ENABLE_NTP_SYNC
   case "$ENABLE_NTP_SYNC" in
   y|Y|yes|YES|Yes)
@@ -1006,7 +1011,7 @@ if [ $STATICIPS -lt 1 ] ; then
   echo ""
   echo "It is recommended that you use static IP addressing for configuring the network interfaces on your Eucalyptus infrastructure servers."
   echo ""
-  while ! echo "$CONFIGURE_NETWORKING" | grep -iE '(^y$|^yes$|^n$|^no$)' ; do
+  while ! echo "$CONFIGURE_NETWORKING" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
     read -p "Would you like to reconfigure your network settings now? " CONFIGURE_NETWORKING
     case "$CONFIGURE_NETWORKING" in
     y|Y|yes|YES|Yes)
@@ -1029,29 +1034,32 @@ for INTERFACE in `ls /etc/sysconfig/network-scripts/ | grep ifcfg | cut -d- -f2 
   if grep 'ONBOOT=no' /etc/sysconfig/network-scripts/ifcfg-${INTERFACE} > /dev/null ; then
     echo ""
     echo "Interface ${INTERFACE} is currently disabled."
-    read -p "Would you like to enable the interface ${INTERFACE}? " ENABLE_INTERFACE
-    case "$ENABLE_INTERFACE" in
-    y|Y|yes|YES|Yes)
-      echo "$(date)- Enabling interface ${INTERFACE}." | tee -a $LOGFILE
-      sed -i -e 's/ONBOOT=no/ONBOOT=yes/' /etc/sysconfig/network-scripts/ifcfg-${INTERFACE} | tee -a $LOGFILE
-      service network restart
-      error_check
-      ;;
-    n|N|no|NO|No)
-      echo "$(date)- Skipped enabling interface ${INTERFACE}." | tee -a $LOGFILE
-      ;;
-    *)
-      echo "Please answer either 'yes' or 'no'."
-    esac
+    while ! echo "$ENABLE_INTERFACE" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
+      read -p "Would you like to enable the interface ${INTERFACE}? " ENABLE_INTERFACE
+      case "$ENABLE_INTERFACE" in
+      y|Y|yes|YES|Yes)
+        echo "$(date)- Enabling interface ${INTERFACE}." | tee -a $LOGFILE
+        sed -i -e 's/ONBOOT=no/ONBOOT=yes/' /etc/sysconfig/network-scripts/ifcfg-${INTERFACE} | tee -a $LOGFILE
+        service network restart
+        error_check
+        ;;
+      n|N|no|NO|No)
+        echo "$(date)- Skipped enabling interface ${INTERFACE}." | tee -a $LOGFILE
+        ;;
+      *)
+        echo "Please answer either 'yes' or 'no'."
+      esac
+    done
   fi
 done
 
 # Ask user to reconfigure DNS if no DNS servers are detected
 NAMESERVERS=`grep ^nameserver /etc/resolv.conf | wc -l`
 if [ $NAMESERVERS -lt 1 ] ; then
+  echo ""
   echo "It looks like you do not have DNS resolvers configured."
   echo ""
-  while ! echo "$CONFIGURE_DNS" | grep -iE '(^y$|^yes$|^n$|^no$)' ; do
+  while ! echo "$CONFIGURE_DNS" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
     read -p "Would you like to reconfigure your DNS settings now? " CONFIGURE_DNS
     case "$CONFIGURE_DNS" in
     y|Y|yes|YES|Yes)
@@ -1114,9 +1122,12 @@ fi
 # Set clock and enable ntpd service
 echo ""
 echo "It is important that time is synchronized across your Eucalyptus infrastructure."
+echo ""
 echo "The recommended way to ensure time remains synchronized is to enable the NTP service, which synchronizes time with Internet servers."
+echo ""
 echo "If your systems have Internet access, and you would like to use NTP to synchronize their clocks with the default pool.ntp.org servers, please answer yes."
-while ! echo "$ENABLE_NTP_SYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' ; do
+echo ""
+while ! echo "$ENABLE_NTP_SYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
   read -p "Enable NTP and synchronize clock? " ENABLE_NTP_SYNC
   case "$ENABLE_NTP_SYNC" in
   y|Y|yes|YES|Yes)
@@ -1159,7 +1170,7 @@ sed --in-place 's/^VNET_MODE="SYSTEM"/#VNET_MODE="SYSTEM"/' /etc/eucalyptus/euca
 echo ""
 echo "We need some network information"
 EUCACONFIG=/etc/eucalyptus/eucalyptus.conf
-edit_prop VNET_MODE "The Eucalyptus networking mode" $EUCACONFIG
+edit_prop VNET_MODE "Which Eucalyptus networking mode would you like to use? " $EUCACONFIG
 edit_prop VNET_PUBINTERFACE "The NC public ethernet interface (connected to Frontend private network)" $EUCACONFIG
 NC_PUBINTERFACE=`grep '^VNET_PUBINTERFACE=' /etc/eucalyptus/eucalyptus.conf | sed -e 's/.*VNET_PUBINTERFACE=\"\(.*\)\"/\1/'`
 
@@ -1286,6 +1297,12 @@ echo "This machine is ready and running as a Node Controller."
 echo "You can re-run this configuration scipt  later by executing /usr/local/sbin/eucalyptus-nc-config.sh as root."
 echo ""
 echo "After all Node Controllers are installed and configured, install and configure your Frontend server."
+
+if [ $ELVERSION -eq 5 ] ; then
+  echo "Your system needs to reboot to complete configuration changes."
+  read -p "Press [Enter] key to reboot..."
+  shutdown -r now
+fi
 
 EOF
 
@@ -1489,8 +1506,8 @@ eucalyptus-cloud eucalyptus-common-java.x86_64 eucalyptus-gl.x86_64 eucalyptus-n
 eucalyptus-sc.x86_64 eucalyptus-walrus.x86_64 expat.x86_64 file.x86_64 filesystem.x86_64 \
 findutils.x86_64 fipscheck.x86_64 fipscheck-lib.x86_64 fontconfig.x86_64 freetype.x86_64 \
 fuse-libs.x86_64 gawk.x86_64 gdbm.x86_64 geronimo-specs.x86_64 geronimo-specs-compat.x86_64 \
-giflib.x86_64 gjdoc.x86_64 glib2.x86_64 glibc.x86_64 glibc-common.x86_64 gnutls.x86_64 grep.x86_64 \
-grub.x86_64 gtk2.x86_64 gzip.x86_64 hal.x86_64 hesiod.x86_64 hicolor-icon-theme.noarch \
+giflib.x86_64 gjdoc.x86_64 glib2.x86_64 glibc.i686 glibc.x86_64 glibc-common.x86_64 gnutls.x86_64 \
+grep.x86_64 grub.x86_64 gtk2.x86_64 gzip.x86_64 hal.x86_64 hesiod.x86_64 hicolor-icon-theme.noarch \
 hmaccalc.x86_64 httpd.x86_64 hwdata.noarch info.x86_64 initscripts.x86_64 iproute.x86_64 \
 iptables.x86_64 iptables-ipv6.x86_64 iputils.x86_64 iscsi-initiator-utils.x86_64 \
 jakarta-commons-collections.x86_64 jakarta-commons-discovery.x86_64 \
