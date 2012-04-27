@@ -242,7 +242,7 @@ cat > ${BUILDDIR}/isolinux/ks/frontend.cfg <<"EOFFRONTENDKICKSTART"
 install
 cdrom
 network --device=eth0 --bootproto=query
-firewall --disabled
+firewall --disabled --port=22:tcp,53:tcp,53:udp,67:udp,3260:tcp,8443:tcp,8772:tcp,8773:tcp,8774:tcp
 authconfig --enableshadow --enablemd5                                                                                                                                                         
 selinux --disabled
 
@@ -884,7 +884,7 @@ cat > ${BUILDDIR}/isolinux/ks/nc.cfg <<"EOFNCKICKSTART"
 install
 cdrom
 network --device=eth0 --bootproto=query
-firewall --disabled
+firewall --disabled --port=22:tcp,8775:tcp
 authconfig --enableshadow --enablemd5                                                                                                                                                         
 selinux --disabled
 
