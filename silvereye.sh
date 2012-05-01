@@ -123,6 +123,12 @@ function install_package {
   fi
 }
 
+# Exit if the script is not run with root privileges
+if [ "$EUID" != "0" ] ; then
+  echo "This script must be run with root privileges."
+  exit 1
+fi
+
 # Create the build directory structure and cd into it
 ELVERSION=`cat /etc/redhat-release | sed -e 's/.* \([56]\).*/\1/'`
 DATESTAMP=`date +%s.%N | rev | cut -b 4- | rev`
@@ -256,6 +262,7 @@ EUCALYPTUSRELEASEPACKAGEREPLACEME
 java-1.6.0-openjdk
 libxml2-python
 ntp
+selinux-policy
 system-config-network-tui
 unzip
 eucalyptus-cloud
@@ -265,6 +272,10 @@ eucalyptus-sc
 euca2ools
 
 %post --log=/root/frontend-ks-post.log
+# Disable SELinux
+sed -i -e 's/SELINUX=enforcing/SELINUX=disabled/' /etc/sysconfig/selinux
+sed -i -e 's/^\(\tkernel.*\)$/\0 selinux=0/' /boot/grub/grub.conf
+
 # Set the default Eucalyptus networking mode
 sed -i -e 's/^VNET_MODE=\"SYSTEM\"/VNET_MODE=\"MANAGED-NOVLAN"/' /etc/eucalyptus/eucalyptus.conf
 
@@ -306,6 +317,9 @@ export CLUSTER_NAME=cluster01
 
 # Set log file destination
 export LOGFILE=/var/log/eucalyptus-frontend-config.log
+
+# Set ELVERSION
+export ELVERSION=`cat /etc/redhat-release | sed -e 's/.* \([56]\).*/\1/'`
 
 # Error checking function
 function error_check {
@@ -351,14 +365,8 @@ function edit_prop {
   done
 }
 
-ELVERSION=`cat /etc/redhat-release | sed -e 's/.* \([56]\).*/\1/'`
-
-echo ""
-echo "Welcome to the Eucalyptus frontend configuration script."
-echo ""
-echo "It is recommended that the Node Controllers are installed and configured prior to continuing this frontend configuration."
-echo ""
-
+# Function for configuring the Eucalyptus frontend
+function configure_frontend {
 # Save old log file
 if [ -f $LOGFILE ]
 then
@@ -781,7 +789,7 @@ echo "Ready to register node controllers. Once they are installed, enter their I
 done="not"
 while [ $done != "done" ]
 do
-  read -p "Node IP :" node
+  read -p "Node IP (ENTER when done): " node
   if [ ! $node ]
   then
     done="done"
@@ -797,42 +805,40 @@ done
 error_check
 echo "$(date)- Registered components " |tee -a $LOGFILE
 echo ""
-echo "Please visit https://$PUBLIC_IP_ADDRESS:8443/ to start using your cloud!"
-echo ""
+}
 
-# Ask the user if they would like to install a graphical desktop on the Frontend server
-while ! echo "$INSTALL_DESKTOP" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
-echo "If you have Internet access, you can optionally install a graphical desktop."
-echo "This will download approximately 300 MB of packages, which may take a long time,"
-echo "depending on the speed of your Internet connection."
-echo ""
-read -p "Would you like to install a graphical desktop on this Frontend server? " INSTALL_DESKTOP
-  case "$INSTALL_DESKTOP" in
-  y|Y|yes|YES|Yes)
-    echo "$(date)- Installing graphical desktop.  This may take a few minutes." |tee -a $LOGFILE
-    echo ""
-    case "$ELVERSION" in
-    "5")
-      yum -y groupinstall 'GNOME Desktop Environment' 'X Window System'
-      ;;
-    "6")
-      yum -y groupinstall 'X Window System' 'Desktop'
-      ;;
-    esac
-    yum -y install firefox
-    echo ""
-    echo "In order to log in to the graphical desktop you must use a non-root user."
-    LOCALUSER=""
-    while [ -z "$LOCALUSER" ] ; do
-      read -p "Please provide a user name for logging in to the graphical desktop: " LOCALUSER
-    done
-    useradd -d /home/${LOCALUSER} -m ${LOCALUSER}
-    echo ""
-    echo "Please enter a password for ${LOCALUSER}."
-    passwd ${LOCALUSER}
-    sed --in-place 's/id:3:initdefault:/id:5:initdefault:/g' /etc/inittab
-    mkdir -p /home/${LOCALUSER}/Desktop
-    cat >> /home/${LOCALUSER}/Desktop/Eucalyptus.desktop << "DESKTOPSHORTCUT"
+# Function for installing graphical desktop
+function install_desktop {
+  echo "$(date)- Installing graphical desktop.  This may take a few minutes." |tee -a $LOGFILE
+  echo ""
+  case "$ELVERSION" in
+  "5")
+    yum -y groupinstall 'GNOME Desktop Environment' 'X Window System'
+    ;;
+  "6")
+    yum -y groupinstall 'X Window System' 'Desktop'
+    ;;
+  esac
+  yum -y install firefox
+  sed --in-place 's/id:3:initdefault:/id:5:initdefault:/g' /etc/inittab
+  chkconfig NetworkManager off
+  sed -i -e 's/NM_CONTROLLED=yes/NM_CONTROLLED=no/' /etc/sysconfig/network-scripts/ifcfg-*
+  error_check
+  echo "$(date)- Graphical desktop installed." | tee -a $LOGFILE
+}
+
+# Function to create users
+function create_user {
+  LOCALUSER=""
+  while [ -z "$LOCALUSER" ] ; do
+    read -p "Please provide a user name for logging in to the graphical desktop: " LOCALUSER
+  done
+  useradd -d /home/${LOCALUSER} -m ${LOCALUSER}
+  echo ""
+  echo "Please enter a password for ${LOCALUSER}."
+  passwd ${LOCALUSER}
+  mkdir -p /home/${LOCALUSER}/Desktop
+  cat >> /home/${LOCALUSER}/Desktop/Eucalyptus.desktop << "DESKTOPSHORTCUT"
 [Desktop Entry]
 Encoding=UTF-8
 Name=Eucalyptus Web Admin
@@ -841,12 +847,50 @@ URL=https://REPLACE_PUBLIC_IP_ADDRESS:8443/
 Icon=gnome-fs-bookmark
 Name[en_US]=Eucalyptus Web Admin
 DESKTOPSHORTCUT
-    sed -i -e "s/REPLACE_PUBLIC_IP_ADDRESS/$PUBLIC_IP_ADDRESS/" /home/${LOCALUSER}/Desktop/Eucalyptus.desktop
-    chown -R ${LOCALUSER}:${LOCALUSER} /home/${LOCALUSER}/Desktop
-    error_check
-    echo "$(date)- Graphical desktop installed.  The system will now change runlevels." |tee -a $LOGFILE
-    read -p "Press [Enter] key to change runlevels..."
-    init 5
+  sed -i -e "s/REPLACE_PUBLIC_IP_ADDRESS/$PUBLIC_IP_ADDRESS/" /home/${LOCALUSER}/Desktop/Eucalyptus.desktop
+  chown -R ${LOCALUSER}:${LOCALUSER} /home/${LOCALUSER}/Desktop
+  error_check
+}
+
+# User interaction starts here
+echo ""
+echo "Welcome to the Eucalyptus frontend configuration script."
+echo ""
+echo "It is recommended that the Node Controllers are installed and configured prior to continuing this Frontend configuration."
+echo ""
+CONFIGUREFRONTEND=""
+while ! echo "$CONFIGUREFRONTEND" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
+  read -p "Would you like to configure your Frontend server now? " CONFIGUREFRONTEND
+  case "$CONFIGUREFRONTEND" in
+  y|Y|yes|YES|Yes)
+    echo "$(date)- Configuring Frontend." | tee -a $LOGFILE
+    configure_frontend
+    echo "$(date)- Configured Frontend." | tee -a $LOGFILE
+    echo ""
+    echo "This machine is ready and running as a Frontend."
+    echo ""
+    ;;
+  n|N|no|NO|No)
+    echo "$(date)- Skipped Frontend configuration." | tee -a $LOGFILE
+    echo ""
+    ;;
+  *)
+    echo "Please answer either 'yes' or 'no'."
+    ;;
+  esac
+done
+
+# Ask the user if they would like to install a graphical desktop on the Frontend server
+INSTALLDESKTOP=""
+while ! echo "$INSTALLDESKTOP" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
+echo "If you have Internet access, you can optionally install a graphical desktop."
+echo "This will download approximately 300 MB of packages, which may take a long time,"
+echo "depending on the speed of your Internet connection."
+echo ""
+read -p "Would you like to install a graphical desktop on this server? " INSTALLDESKTOP
+  case "$INSTALLDESKTOP" in
+  y|Y|yes|YES|Yes)
+    install_desktop
     ;;
   n|N|no|NO|No)
     echo "$(date)- Skipped graphical desktop installation." | tee -a $LOGFILE
@@ -856,6 +900,47 @@ DESKTOPSHORTCUT
     ;;
   esac
 done
+
+# If the graphical desktop installed, make sure we have a non-root user
+rpm -q gdm > /dev/null
+if [ $? -eq 0 ] ; then
+  echo "In order to log in to the graphical desktop you must use a non-root user."
+  CREATEUSER=""
+  while ! echo "$CREATEUSER" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
+    HIGHESTUID=`cut -d: -f3 /etc/passwd | sort -n | grep -v 65534 | tail -n 1`
+    if [ $HIGHESTUID -lt 500 ] ; then
+      CREATEUSER="yes"
+    else
+      read -p "Would you like to create another user? " CREATEUSER
+    fi
+    case "$CREATEUSER" in
+    y|Y|yes|YES|Yes)
+      create_user
+      ;;
+    n|N|no|NO|No)
+      echo "$(date)- Skipped user creation." | tee -a $LOGFILE
+      ;;
+    *)
+      echo "Please answer either 'yes' or 'no'."
+      ;;
+    esac
+  done
+fi
+
+echo "You can re-run this configuration scipt later by executing /usr/local/sbin/eucalyptus-frontend-config.sh as root."
+echo ""
+case "$INSTALLDESKTOP" in
+  y|Y|yes|YES|Yes)
+    echo "Your system needs to reboot to complete configuration changes."
+    read -p "Press ENTER to reboot." REBOOTME
+    shutdown -r now
+    ;;
+  n|N|no|NO|No)
+    echo "Please visit https://$PUBLIC_IP_ADDRESS:8443/ to start using your cloud!"
+    echo ""
+    ;;
+esac
+
 EOF
 
 chmod 770 /usr/local/sbin/eucalyptus-frontend-config.sh
@@ -867,9 +952,9 @@ chmod 770 /usr/local/sbin/eucalyptus-frontend-config.sh
 cp /etc/rc.d/rc.local /etc/rc.d/rc.local.orig
 cat >> /etc/rc.d/rc.local <<"EOF"
 
-# Add eucalyptus-frontend-config.sh script to root's .bash_profile, and have the original .bash_profile moved in after the first run
-echo '/usr/local/sbin/eucalyptus-frontend-config.sh' >> /root/.bash_profile
+# Add eucalyptus-frontend-config.sh script to root's .bash_profile, and have the original .bash_profile moved in on the first run
 echo '/bin/cp -af /root/.bash_profile.orig /root/.bash_profile' >> /root/.bash_profile
+echo '/usr/local/sbin/eucalyptus-frontend-config.sh' >> /root/.bash_profile
 
 # Replace /etc/rc.d/rc.local with the original backup copy
 rm -f /etc/rc.d/rc.local
@@ -899,12 +984,17 @@ EUCALYPTUSRELEASEPACKAGEREPLACEME
 kernel-xen
 libxml2-python
 ntp
+selinux-policy
 xen
 eucalyptus-nc
 euca2ools
 -kernel
 
 %post --log=/root/nc-ks-post.log
+# Disable SELinux
+sed -i -e 's/SELINUX=enforcing/SELINUX=disabled/' /etc/sysconfig/selinux
+sed -i -e 's/^\(\tkernel.*\)$/\0 selinux=0/' /boot/grub/grub.conf
+
 # Workaround for grub not getting installed correctly on software RAID /boot partitions
 rpm -q kernel-xen > /dev/null
 if [ $? -eq 0 ] ; then
@@ -951,6 +1041,9 @@ cat >> /usr/local/sbin/eucalyptus-nc-config.sh <<"EOF"
 # Set log file destination
 export LOGFILE=/var/log/eucalyptus-nc-config.log
 
+# Set ELVERSION
+export ELVERSION=`cat /etc/redhat-release | sed -e 's/.* \([56]\).*/\1/'`
+
 # Error checking function
 function error_check {
   count=`grep -i 'error\|fail\|exception' $LOGFILE|wc -l`
@@ -994,8 +1087,6 @@ function edit_prop {
     fi
   done
 }
-
-ELVERSION=`cat /etc/redhat-release | sed -e 's/.* \([56]\).*/\1/'`
 
 echo ""
 echo "Welcome to the Eucalyptus node controller configuration script."
@@ -1323,9 +1414,9 @@ chmod 770 /usr/local/sbin/eucalyptus-nc-config.sh
 cp /etc/rc.d/rc.local /etc/rc.d/rc.local.orig
 cat >> /etc/rc.d/rc.local <<"EOF"
 
-# Add eucalyptus-nc-config.sh script to root's .bash_profile, and have the original .bash_profile moved in after the first run
-echo '/usr/local/sbin/eucalyptus-nc-config.sh' >> /root/.bash_profile
+# Add eucalyptus-nc-config.sh script to root's .bash_profile, and have the original .bash_profile moved in on the first run
 echo '/bin/cp -af /root/.bash_profile.orig /root/.bash_profile' >> /root/.bash_profile
+echo '/usr/local/sbin/eucalyptus-nc-config.sh' >> /root/.bash_profile
 
 # Replace /etc/rc.d/rc.local with the original backup copy
 rm -f /etc/rc.d/rc.local
