@@ -26,20 +26,20 @@
 # If the EPEL, ELRepo, euca2ools and Eucalyptus package repositories are not
 # present on the system this script will install/create them.
 #
-# If you have a local mirror that you prefer to use, set up your yum
-# configuration to use it, and uncomment the line below.
-#MIRROR="http://192.168.7.65/centos/$(cat /etc/redhat-release | sed -e 's/.* \([56]\).*/\1/')/os/x86_64/"
-#EPELMIRROR="http://192.168.7.65/epel/$(cat /etc/redhat-release | sed -e 's/.* \([56]\).*/\1/')/x86_64/"
-#if grep -E '(CentOS release 5)' /etc/redhat-release ; then
-#  ELREPO_PACKAGE_URL='http://192.168.7.65/elrepo/el5/x86_64/RPMS/elrepo-release-5-3.el5.elrepo.noarch.rpm'
-#elif grep -E '(CentOS release 6)' /etc/redhat-release ; then
-#  ELREPO_PACKAGE_URL='http://192.168.7.65/elrepo/el6/x86_64/RPMS/elrepo-release-6-4.el6.elrepo.noarch.rpm'
-#fi
-#YUM_ELREPO_URL='http://192.168.7.65/elrepo'
+#
+# If you have a local mirror that you prefer to use, uncomment the line(s) below.
+#CENTOSMIRROR="http://10.1.1.240/centos/"
+#EPELMIRROR="http://10.1.1.240/epel/"
+#ELREPOMIRROR="http://10.1.1.240/elrepo/"
+#PGRPM91MIRROR="http://10.1.1.240/pgrpm-91/"
 
-EUCALYPTUSVERSION="3.0"
+# Set the EUCALYPTUSVERSION variable to the version of Eucalyptus you would like
+# to create an installation disk for.
+# Valid values are "3.0" and "3-devel".
+# Subscriptions are required for "3.0"
+EUCALYPTUSVERSION="3-devel"
 
-# For paid subscriptions, enter your yum credentials in these variables
+# For subscriptions, enter your yum credentials in these variables
 ENTERPRISECERT="-----BEGIN CERTIFICATE-----
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
@@ -159,10 +159,10 @@ install_package curl
 install_package wget
 
 #Set the mirror to use for retrieving files
-if [ -z "$MIRROR" ] ; then
-  FETCHMIRROR=`curl -s http://mirrorlist.centos.org/?release=$(cat /etc/redhat-release | sed -e 's/.* \([56]\).*/\1/')\&arch=x86_64\&repo=os | grep -vE '(^#|^ftp)' | head -n 1`
+if [ -z "$CENTOSMIRROR" ] ; then
+  FETCHMIRROR=`curl -s http://mirrorlist.centos.org/?release=${ELVERSION}\&arch=x86_64\&repo=os | grep -vE '(^#|^ftp)' | head -n 1`
 else
-  FETCHMIRROR="${MIRROR}"
+  FETCHMIRROR="${CENTOSMIRROR}${ELVERSION}/os/x86_64/"
 fi
 echo "$(date) - Using $FETCHMIRROR for downloads" | tee -a $SILVEREYELOGFILE
 
@@ -816,7 +816,7 @@ function install_desktop {
     yum -y groupinstall 'GNOME Desktop Environment' 'X Window System'
     ;;
   "6")
-    yum -y groupinstall 'X Window System' 'Desktop'
+    yum -y groupinstall 'X Window System' 'Desktop' 'Fonts'
     ;;
   esac
   yum -y install firefox
@@ -1478,26 +1478,32 @@ case "$EUCALYPTUSVERSION" in
   sed -i -e "s#REPLACEMEEUCAGPGKEY#echo \"`echo -e "${EUCAGPGKEY}" | sed ':a;N;$!ba;s/\n/NEWLINETAG/g'`\" > /etc/pki/rpm-gpg/eucalyptus-release-key.pub#" ${BUILDDIR}/isolinux/ks/*.cfg
   sed -i -e 's/NEWLINETAG/\n/g' ${BUILDDIR}/isolinux/ks/*.cfg
   ;;
-"3.1")
-  sed -i -e 's/EUCALYPTUSRELEASEPACKAGEREPLACEME/eucalyptus-nightly-release/' ${BUILDDIR}/isolinux/ks/*.cfg
+"3-devel")
+  sed -i -e 's/EUCALYPTUSRELEASEPACKAGEREPLACEME/eucalyptus-nightly-release\npgdg-centos91/' ${BUILDDIR}/isolinux/ks/*.cfg
   sed -i -e '/REPLACEMEENTERPRISECERT/d' ${BUILDDIR}/isolinux/ks/*.cfg
   sed -i -e '/REPLACEMEENTERPRISEPRIVATEKEY/d' ${BUILDDIR}/isolinux/ks/*.cfg
   sed -i -e '/REPLACEMEEUCAGPGKEY/d' ${BUILDDIR}/isolinux/ks/*.cfg
   ;;
 esac
 
+# Install/configure yum repositories
+# Configure CentOS repository
+if [ -n "$CENTOSMIRROR" ] ; then
+  sed -i -e 's%^mirrorlist=http.*%#\0%g' /etc/yum.repos.d/CentOS-*.repo
+  sed -i -e "s%#baseurl=http://mirror.centos.org/centos/%baseurl=${CENTOSMIRROR}%g" /etc/yum.repos.d/CentOS-*.repo
+fi
+
 # Install yum-utils if it isn't already installed
 install_package yum-utils
 
-# Install/configure yum repositories
 # Install/configure EPEL repository
 rpm -q epel-release > /dev/null
 if [ $? -eq 1 ] ; then
   echo "$(date) - Installing EPEL package" | tee -a $SILVEREYELOGFILE
   if [ -z "$EPELMIRROR" ] ; then
-    EPELFETCHMIRROR=`curl -s http://mirrors.fedoraproject.org/mirrorlist?repo=epel-$(cat /etc/redhat-release | sed -e 's/.* \([56]\).*/\1/')\&arch=x86_64 | grep -vE '(^#|^ftp)' | head -n 1`
+    EPELFETCHMIRROR=`curl -s http://mirrors.fedoraproject.org/mirrorlist?repo=epel-${ELVERSION}\&arch=x86_64 | grep -vE '(^#|^ftp)' | head -n 1`
   else
-    EPELFETCHMIRROR="${EPELMIRROR}"
+    EPELFETCHMIRROR="${EPELMIRROR}${ELVERSION}/x86_64/"
   fi
   case "$ELVERSION" in
   "5")
@@ -1512,31 +1518,75 @@ if [ $? -eq 1 ] ; then
 else
   echo "$(date) - EPEL package already installed" | tee -a $SILVEREYELOGFILE
 fi
+if [ -n "$EPELMIRROR" ] ; then
+  sed -i -e 's%^mirrorlist=http.*%#\0%g' /etc/yum.repos.d/epel.repo
+  sed -i -e "s%#baseurl=http://download.fedoraproject.org/pub/epel/%baseurl=${EPELMIRROR}%g" /etc/yum.repos.d/epel.repo
+fi
 
 # Install/configure ELRepo repository
 rpm -q elrepo-release > /dev/null
 if [ $? -eq 1 ] ; then
   echo "$(date) - Installing ELRepo package" | tee -a $SILVEREYELOGFILE
-  if [ ! $ELREPO_PACKAGE_URL ] ; then
-    case "$ELVERSION" in
-    "5")
-      ELREPO_PACKAGE_URL='http://elrepo.org/linux/elrepo/el5/x86_64/RPMS/elrepo-release-5-3.el5.elrepo.noarch.rpm'
-      ;;
-    "6")
-      ELREPO_PACKAGE_URL='http://elrepo.org/linux/elrepo/el6/x86_64/RPMS/elrepo-release-6-4.el6.elrepo.noarch.rpm'
-      ;;
-    esac
+  if [ -z "$ELREPOMIRROR" ] ; then
+    ELREPOFETCHMIRROR=`curl -s http://elrepo.org/mirrors-elrepo.el${ELVERSION} | grep -vE '(^#|^ftp)' | sed -e 's/$basearch/x86_64/' | head -n 1`
+  else
+    ELREPOFETCHMIRROR="${ELREPOMIRROR}el${ELVERSION}/x86_64/"
   fi
-  wget $ELREPO_PACKAGE_URL
+  case "$ELVERSION" in
+  "5")
+    wget ${ELREPOFETCHMIRROR}/RPMS/elrepo-release-5-3.el5.elrepo.noarch.rpm
+    ;;
+  "6")
+    wget ${ELREPOFETCHMIRROR}/RPMS/elrepo-release-6-4.el6.elrepo.noarch.rpm
+    ;;
+  esac
   rpm -Uvh elrepo-release-*.noarch.rpm
   rm -f elrepo-release-*.noarch.rpm
 else
   echo "$(date) - ELRepo package already installed" | tee -a $SILVEREYELOGFILE
 fi
-if [ -n "$YUM_ELREPO_URL" ] ; then
+if [ -n "$ELREPOMIRROR" ] ; then
   sed -i -e 's%^mirrorlist=http.*%#\0%g' /etc/yum.repos.d/elrepo.repo
-  sed -i -e "s%baseurl=http://elrepo.org/linux/elrepo%baseurl=$YUM_ELREPO_URL%g" /etc/yum.repos.d/elrepo.repo
+  sed -i -e "s%baseurl=http://elrepo.org/linux/elrepo/%baseurl=${ELREPOMIRROR}%g" /etc/yum.repos.d/elrepo.repo
 fi
+
+# Install/configure PostgreSQL repository if it's required, remove it if it's not required.
+case "$EUCALYPTUSVERSION" in
+"3.0")
+  rpm -q pgdg-centos91 > /dev/null
+  if [ $? -eq 0 ] ; then
+    echo "$(date) - Removing PostgreSQL repository package" | tee -a $SILVEREYELOGFILE
+    yum -y remove pgdg-centos91*
+  else
+    echo "$(date) - PostgreSQL repository package not present" | tee -a $SILVEREYELOGFILE
+  fi
+  if [ -f /etc/yum.repos.d/pgdg-91-centos.repo ] ; then
+    rm -f /etc/yum.repos.d/pgdg-91-centos.repo
+  fi
+  ;;
+"3-devel")
+  rpm -q pgdg-centos91 > /dev/null
+  if [ $? -eq 1 ] ; then
+    echo "$(date) - Installing PostgreSQL repository package" | tee -a $SILVEREYELOGFILE
+    if [ -z "$PGRPM91MIRROR" ] ; then
+      PGRPM91FETCHMIRROR="http://yum.postgresql.org/9.1/redhat/rhel-${ELVERSION}-x86_64/"
+    else
+      PGRPM91FETCHMIRROR="${PGRPM91MIRROR}redhat/rhel-${ELVERSION}-x86_64/"
+    fi
+    wget ${PGRPM91FETCHMIRROR}/pgdg-centos91-9.1-4.noarch.rpm
+    rpm -Uvh pgdg-centos91*.rpm
+    rm -f pgdg-centos91*.rpm
+  else
+    echo "$(date) - PostgreSQL repository package already installed" | tee -a $SILVEREYELOGFILE
+  fi
+  if [ -n "$PGRPM91MIRROR" ] ; then
+    sed -i -e "s%baseurl=http://yum.postgresql.org/9.1/redhat/rhel-.*%baseurl=${PGRPM91MIRROR}redhat/rhel-${ELVERSION}-x86_64%g" /etc/yum.repos.d/pgdg-91-centos.repo
+  fi
+  ;;
+*)
+  echo "$(date) - Unsupported EUCALYPTUSVERSION $EUCALYPTUSVERSION" | tee -a $SILVEREYELOGFILE
+  ;;
+esac
 
 # Install/configure Eucalyptus repository
 case "$EUCALYPTUSVERSION" in
@@ -1556,8 +1606,37 @@ gpgcheck=1
 sslclientcert=/etc/pki/tls/certs/eucalyptus-enterprise.crt
 sslclientkey=/etc/pki/tls/private/eucalyptus-enterprise.key
 EOF
+  rpm -q pgdg-centos91 > /dev/null
+  if [ $? -eq 0 ] ; then
+    echo "$(date) - Removing PostgreSQL repository package" | tee -a $SILVEREYELOGFILE
+    yum -y remove pgdg-centos91*
+  else
+    echo "$(date) - PostgreSQL repository package not present" | tee -a $SILVEREYELOGFILE
+  fi
+  if [ -f /etc/yum.repos.d/pgdg-91-centos.repo ] ; then
+    rm -f /etc/yum.repos.d/pgdg-91-centos.repo
+  fi
+  rpm -q eucalyptus-nightly-release > /dev/null
+  if [ $? -eq 0 ] ; then
+    echo "$(date) - Removing Eucalyptus nightly repository package" | tee -a $SILVEREYELOGFILE
+    yum -y remove eucalyptus-nightly-release*
+  else
+    echo "$(date) - Eucalyptus nightly repository package not present" | tee -a $SILVEREYELOGFILE
+  fi
+  if [ -f /etc/yum.repos.d/eucalyptus-nightly-release.repo ] ; then
+    rm -f /etc/yum.repos.d/eucalyptus-nightly-release.repo
+  fi
   ;;
-"3.1")
+"3-devel")
+  rpm -q pgdg-centos91 > /dev/null
+  if [ $? -eq 1 ] ; then
+    echo "$(date) - Installing PostgreSQL repository package" | tee -a $SILVEREYELOGFILE
+    wget http://yum.postgresql.org/9.1/redhat/rhel-${ELVERSION}-x86_64/pgdg-centos91-9.1-4.noarch.rpm
+    rpm -Uvh pgdg-centos91*.rpm
+    rm -f pgdg-centos91*.rpm
+  else
+    echo "$(date) - PostgreSQL repository package already installed" | tee -a $SILVEREYELOGFILE
+  fi
   rpm -q eucalyptus-nightly-release > /dev/null
   if [ $? -eq 1 ] ; then
     echo "$(date) - Installing Eucalyptus nightly repository package" | tee -a $SILVEREYELOGFILE
@@ -1566,6 +1645,16 @@ EOF
     rm -f eucalyptus-nightly-release-*.rpm
   else
     echo "$(date) - Eucalyptus nightly repository package already installed" | tee -a $SILVEREYELOGFILE
+  fi
+  rpm -q eucalyptus-release-enterprise > /dev/null
+  if [ $? -eq 0 ] ; then
+    echo "$(date) - Removing Eucalyptus Enterprise repository package" | tee -a $SILVEREYELOGFILE
+    yum -y remove eucalyptus-release-enterprise*
+  else
+    echo "$(date) - Eucalyptus Enterprise repository package not present" | tee -a $SILVEREYELOGFILE
+  fi
+  if [ -f /etc/yum.repos.d/eucalyptus-enterprise.repo ] ; then
+    rm -f /etc/yum.repos.d/eucalyptus-enterprise.repo
   fi
   ;;
 *)
@@ -1601,10 +1690,10 @@ diffutils.x86_64 dmidecode.x86_64 dmraid.x86_64 dmraid-events.x86_64 dnsmasq.x86
 drbd83-utils.x86_64 e2fsprogs.x86_64 e2fsprogs-libs.x86_64 e4fsprogs-libs.x86_64 ebtables.x86_64 \
 ed.x86_64 elfutils-libelf.x86_64 elrepo-release.noarch epel-release.noarch esound.x86_64 \
 ethtool.x86_64 euca2ools.noarch eucalyptus.x86_64 eucalyptus-admin-tools.x86_64 \
-eucalyptus-broker.x86_64 eucalyptus-cc.x86_64 eucalyptus-cloud eucalyptus-common-java.x86_64 \
-eucalyptus-gl.x86_64 eucalyptus-nc.x86_64 eucalyptus-sc.x86_64 eucalyptus-walrus.x86_64 \
-expat.x86_64 file.x86_64 filesystem.x86_64 findutils.x86_64 fipscheck.x86_64 fipscheck-lib.x86_64 \
-fontconfig.x86_64 freetype.x86_64 fuse-libs.x86_64 gawk.x86_64 gdbm.x86_64 geronimo-specs.x86_64 \
+eucalyptus-cc.x86_64 eucalyptus-cloud eucalyptus-common-java.x86_64 eucalyptus-gl.x86_64 \
+eucalyptus-nc.x86_64 eucalyptus-sc.x86_64 eucalyptus-walrus.x86_64 expat.x86_64 file.x86_64 \
+filesystem.x86_64 findutils.x86_64 fipscheck.x86_64 fipscheck-lib.x86_64 fontconfig.x86_64 \
+freetype.x86_64 fuse-libs.x86_64 gawk.x86_64 gdbm.x86_64 geronimo-specs.x86_64 \
 geronimo-specs-compat.x86_64 giflib.x86_64 gjdoc.x86_64 glib2.x86_64 glibc.i686 glibc.x86_64 \
 glibc-common.x86_64 gnutls.x86_64 grep.x86_64 grub.x86_64 gtk2.x86_64 gzip.x86_64 hal.x86_64 \
 hesiod.x86_64 hicolor-icon-theme.noarch hmaccalc.x86_64 httpd.x86_64 hwdata.noarch info.x86_64 \
@@ -1624,11 +1713,11 @@ libXau.x86_64 libXcursor.x86_64 libXdmcp.x86_64 libXext.x86_64 libXfixes.x86_64 
 libXi.x86_64 libXinerama.x86_64 libxml2.x86_64 libxml2-python.x86_64 libXrandr.x86_64 \
 libXrender.x86_64 libxslt.x86_64 libXtst.x86_64 log4j.x86_64 logrotate.x86_64 lvm2.x86_64 \
 lzo.x86_64 m2crypto.x86_64 mailcap.noarch MAKEDEV.x86_64 mcstrans.x86_64 mdadm.x86_64 \
-mingetty.x86_64 mkinitrd.x86_64 mktemp.x86_64 module-init-tools.x86_64 mx4j.x86_64 mysql.x86_64 \
-nash.x86_64 nc.x86_64 ncurses.x86_64 net-tools.x86_64 newt.x86_64 nfs-utils.x86_64 \
-nfs-utils-lib.x86_64 nspr.x86_64 nss.x86_64 ntp.x86_64 numactl.x86_64 openib.noarch openldap.x86_64 \
-openssh.x86_64 openssh-clients.x86_64 openssh-server.x86_64 openssl.x86_64 pam.x86_64 pango.x86_64 \
-parted.x86_64 passwd.x86_64 pciutils.x86_64 pcre.x86_64 perl.x86_64 perl-Config-General.noarch \
+mingetty.x86_64 mkinitrd.x86_64 mktemp.x86_64 module-init-tools.x86_64 mx4j.x86_64 nash.x86_64 \
+nc.x86_64 ncurses.x86_64 net-tools.x86_64 newt.x86_64 nfs-utils.x86_64 nfs-utils-lib.x86_64 \
+nspr.x86_64 nss.x86_64 ntp.x86_64 numactl.x86_64 openib.noarch openldap.x86_64 openssh.x86_64 \
+openssh-clients.x86_64 openssh-server.x86_64 openssl.x86_64 pam.x86_64 pango.x86_64 parted.x86_64 \
+passwd.x86_64 pciutils.x86_64 pcre.x86_64 perl.x86_64 perl-Config-General.noarch \
 perl-Crypt-OpenSSL-Bignum.x86_64 perl-Crypt-OpenSSL-Random.x86_64 perl-Crypt-OpenSSL-RSA.x86_64 \
 perl-DBI.x86_64 pm-utils.x86_64 policycoreutils.x86_64 popt.x86_64 portmap.x86_64 \
 postgresql-libs.x86_64 procmail.x86_64 procps.x86_64 psmisc.x86_64 python.x86_64 \
@@ -1636,16 +1725,16 @@ python-elementtree.x86_64 python-iniparse.noarch python-libs.x86_64 python-sqlit
 python-urlgrabber.noarch python-virtinst.noarch python26.x86_64 python26-boto.noarch \
 python26-eucadmin.x86_64 python26-libs.x86_64 python26-m2crypto.x86_64 rampartc.x86_64 \
 readline.x86_64 redhat-logos.noarch regexp.x86_64 rhpl.x86_64 rootfiles.noarch rpm.x86_64 \
-rpm-libs.x86_64 rpm-python.x86_64 rsync.x86_64 rsyslog.x86_64 scsi-target-utils.x86_64 \
-SDL.x86_64 sed.x86_64 selinux-policy.noarch sendmail.x86_64 setup.noarch sgpio.x86_64 \
-shadow-utils.x86_64 slang.x86_64 sqlite.x86_64 sudo.x86_64 system-config-network-tui.noarch \
-SysVinit.x86_64 tar.x86_64 tcp_wrappers.x86_64 termcap.noarch tomcat5-servlet-2.4-api.x86_64 \
-tzdata.x86_64 tzdata-java.x86_64 udev.x86_64 unzip.x86_64 usermode.x86_64 util-linux.x86_64 \
-vblade.x86_64 vconfig.x86_64 velocity.x86_64 vim-minimal.x86_64 vtun.x86_64 werken-xpath.x86_64 \
-wget.x86_64 which.x86_64 wireless-tools.x86_64 wsdl4j.x86_64 xalan-j2.x86_64 xen.x86_64 \
-xen-libs.x86_64 xinetd.x86_64 xml-commons.x86_64 xml-commons-apis.x86_64 \
-xml-commons-resolver.x86_64 xorg-x11-filesystem.noarch xz.x86_64 xz-libs.x86_64 yum.noarch \
-yum-fastestmirror.noarch yum-metadata-parser.x86_64 zip.x86_64 zlib.x86_64"
+rpm-libs.x86_64 rpm-python.x86_64 rsync.x86_64 rsyslog.x86_64 scsi-target-utils.x86_64 SDL.x86_64 \
+sed.x86_64 selinux-policy.noarch sendmail.x86_64 setup.noarch sgpio.x86_64 shadow-utils.x86_64 \
+slang.x86_64 sqlite.x86_64 sudo.x86_64 system-config-network-tui.noarch SysVinit.x86_64 tar.x86_64 \
+tcp_wrappers.x86_64 termcap.noarch tomcat5-servlet-2.4-api.x86_64 tzdata.x86_64 tzdata-java.x86_64 \
+udev.x86_64 unzip.x86_64 usermode.x86_64 util-linux.x86_64 vblade.x86_64 vconfig.x86_64 \
+velocity.x86_64 vim-minimal.x86_64 vtun.x86_64 werken-xpath.x86_64 wget.x86_64 which.x86_64 \
+wireless-tools.x86_64 wsdl4j.x86_64 xalan-j2.x86_64 xen.x86_64 xen-libs.x86_64 xinetd.x86_64 \
+xml-commons.x86_64 xml-commons-apis.x86_64 xml-commons-resolver.x86_64 xorg-x11-filesystem.noarch \
+xz.x86_64 xz-libs.x86_64 yum.noarch yum-fastestmirror.noarch yum-metadata-parser.x86_64 zip.x86_64 \
+zlib.x86_64"
   ;;
 "6")
   RPMS="alsa-lib.x86_64 apache-tomcat-apis.noarch apr.x86_64 apr-util.x86_64 apr-util-ldap.x86_64 \
@@ -1665,21 +1754,20 @@ dhcp-common.x86_64 dhcp41.x86_64 dhcp41-common.x86_64 dnsmasq.x86_64 dracut.noar
 dracut-kernel.noarch drbd83-utils.x86_64 e2fsprogs.x86_64 e2fsprogs-libs.x86_64 ebtables.x86_64 \
 eggdbus.x86_64 elfutils-libelf.x86_64 efibootmgr.x86_64 elrepo-release.noarch epel-release.noarch \
 ethtool.x86_64 euca2ools.noarch eucalyptus.x86_64 eucalyptus-admin-tools.noarch \
-eucalyptus-broker.x86_64 eucalyptus-cc.x86_64 eucalyptus-cloud eucalyptus-common-java.x86_64 \
-eucalyptus-gl.x86_64 eucalyptus-nc.x86_64 eucalyptus-sc.x86_64 eucalyptus-walrus.x86_64 \
-expat.x86_64 file.x86_64 file-libs.x86_64 filesystem.x86_64 findutils.x86_64 fipscheck.x86_64 \
-fipscheck-lib.x86_64 flac.x86_64 fontconfig.x86_64 fontpackages-filesystem.noarch freetype.x86_64 \
-fuse-libs.x86_64 gamin.x86_64 gawk.x86_64 gdbm.x86_64 geronimo-specs.noarch \
-geronimo-specs-compat.noarch gettext.x86_64 giflib.x86_64 glib2.x86_64 glibc.i686 glibc.x86_64 \
-glibc-common.x86_64 gmp.x86_64 gnupg2.x86_64 gnutls.x86_64 gnutls-utils.x86_64 gpgme.x86_64 \
-gpxe-roms-qemu.noarch grep.x86_64 groff.x86_64 grub.x86_64 grubby.x86_64 gtk2.x86_64 gzip.x86_64 \
-hicolor-icon-theme.noarch httpd.x86_64 httpd-tools.x86_64 hwdata.noarch info.x86_64 \
-initscripts.x86_64 iproute.x86_64 iptables.x86_64 iptables-ipv6.x86_64 iputils.x86_64 \
-ipw2100-firmware.noarch ipw2200-firmware.noarch iscsi-initiator-utils.x86_64 iw.x86_64 \
-iwl1000-firmware.noarch iwl100-firmware.noarch iwl3945-firmware.noarch \
-iwl4965-firmware.noarch iwl5000-firmware.noarch iwl5150-firmware.noarch iwl6000-firmware.noarch \
-iwl6000g2a-firmware.noarch iwl6000g2b-firmware.noarch iwl6050-firmware.noarch \
-jakarta-commons-collections.noarch jakarta-commons-discovery.noarch \
+eucalyptus-cc.x86_64 eucalyptus-cloud eucalyptus-common-java.x86_64 eucalyptus-gl.x86_64 \
+eucalyptus-nc.x86_64 eucalyptus-sc.x86_64 eucalyptus-walrus.x86_64 expat.x86_64 file.x86_64 \
+file-libs.x86_64 filesystem.x86_64 findutils.x86_64 fipscheck.x86_64 fipscheck-lib.x86_64 \
+flac.x86_64 fontconfig.x86_64 fontpackages-filesystem.noarch freetype.x86_64 fuse-libs.x86_64 \
+gamin.x86_64 gawk.x86_64 gdbm.x86_64 geronimo-specs.noarch geronimo-specs-compat.noarch \
+gettext.x86_64 giflib.x86_64 glib2.x86_64 glibc.i686 glibc.x86_64 glibc-common.x86_64 gmp.x86_64 \
+gnupg2.x86_64 gnutls.x86_64 gnutls-utils.x86_64 gpgme.x86_64 gpxe-roms-qemu.noarch grep.x86_64 \
+groff.x86_64 grub.x86_64 grubby.x86_64 gtk2.x86_64 gzip.x86_64 hicolor-icon-theme.noarch \
+httpd.x86_64 httpd-tools.x86_64 hwdata.noarch info.x86_64 initscripts.x86_64 iproute.x86_64 \
+iptables.x86_64 iptables-ipv6.x86_64 iputils.x86_64 ipw2100-firmware.noarch ipw2200-firmware.noarch \
+iscsi-initiator-utils.x86_64 iw.x86_64 iwl1000-firmware.noarch iwl100-firmware.noarch \
+iwl3945-firmware.noarch iwl4965-firmware.noarch iwl5000-firmware.noarch iwl5150-firmware.noarch \
+iwl6000-firmware.noarch iwl6000g2a-firmware.noarch iwl6000g2b-firmware.noarch \
+iwl6050-firmware.noarch jakarta-commons-collections.noarch jakarta-commons-discovery.noarch \
 jakarta-commons-httpclient.x86_64 jakarta-commons-logging.noarch jakarta-oro.x86_64 \
 jasper-libs.x86_64 java-1.5.0-gcj.x86_64 java-1.6.0-openjdk.x86_64 java_cup.x86_64 jdom.noarch \
 jline.noarch jpackage-utils.noarch kbd.x86_64 kbd-misc.noarch kernel.x86_64 kernel-firmware.noarch \
@@ -1698,50 +1786,63 @@ libXcomposite.x86_64 libXcursor.x86_64 libXdamage.x86_64 libXext.x86_64 libXfixe
 libXft.x86_64 libXi.x86_64 libXinerama.x86_64 libxml2.x86_64 libXrandr.x86_64 libXrender.x86_64 \
 libxslt.x86_64 libXtst.x86_64 log4j.x86_64 logrotate.x86_64 lua.x86_64 lvm2.x86_64 lvm2-libs.x86_64 \
 lzo.x86_64 lzop.x86_64 m2crypto.x86_64 m4.x86_64 mailcap.noarch MAKEDEV.x86_64 mdadm.x86_64 \
-mingetty.x86_64 module-init-tools.x86_64 mx4j.noarch mysql.x86_64 mysql-libs.x86_64 nc.x86_64 \
-ncurses.x86_64 ncurses-base.x86_64 ncurses-libs.x86_64 net-tools.x86_64 netcf-libs.x86_64 \
-newt.x86_64 newt-python.x86_64 nfs-utils.x86_64 nfs-utils-lib.x86_64 nspr.x86_64 nss.x86_64 \
-nss-softokn.x86_64 nss-softokn-freebl.i686 nss-softokn-freebl.x86_64 nss-sysinit.x86_64 \
-nss-util.x86_64 ntp.x86_64 ntpdate.x86_64 numactl.x86_64 openldap.x86_64 openssh.x86_64 \
-openssh-clients.x86_64 openssh-server.x86_64 openssl.x86_64 pam.x86_64 pango.x86_64 parted.x86_64 \
-passwd.x86_64 pciutils.x86_64 pciutils-libs.x86_64 pcre.x86_64 perl.x86_64 \
-perl-Config-General.noarch perl-Crypt-OpenSSL-Bignum.x86_64 perl-Crypt-OpenSSL-Random.x86_64 \
-perl-Crypt-OpenSSL-RSA.x86_64 perl-libs.x86_64 perl-Module-Pluggable.x86_64 perl-Pod-Escapes.x86_64 \
-perl-Pod-Simple.x86_64 perl-version.x86_64 pinentry.x86_64 pixman.x86_64 pkgconfig.x86_64 \
-plymouth.x86_64 plymouth-core-libs.x86_64 plymouth-scripts.x86_64 policycoreutils.x86_64 \
-polkit.x86_64 popt.x86_64 postfix.x86_64 procps.x86_64 psmisc.x86_64 pth.x86_64 \
-pulseaudio-libs.x86_64 pygpgme.x86_64 python.x86_64 python-boto.noarch python-ethtool.x86_64 \
-python-eucadmin.noarch python-iniparse.noarch python-iwlib.x86_64 python-libs.x86_64 \
-python-pycurl.x86_64 python-urlgrabber.noarch qemu-img.x86_64 qemu-kvm.x86_64 \
-ql2100-firmware.noarch ql2200-firmware.noarch ql23xx-firmware.noarch ql2400-firmware.noarch \
-ql2500-firmware.noarch radvd.x86_64 rampartc.x86_64 readline.x86_64 redhat-logos.noarch \
-regexp.x86_64 rhino.noarch rootfiles.noarch rpcbind.x86_64 rpm.x86_64 rpm-libs.x86_64 \
-rpm-python.x86_64 rsync.x86_64 rsyslog.x86_64 rt61pci-firmware.noarch rt73usb-firmware.noarch \
-scsi-target-utils.x86_64 seabios.x86_64 sed.x86_64 selinux-policy.noarch setup.noarch \
-sgabios-bin.noarch shadow-utils.x86_64 sinjdoc.x86_64 slang.x86_64 spice-server.x86_64 \
-sqlite.x86_64 sudo.x86_64 system-config-network-tui.noarch sysvinit-tools.x86_64 tar.x86_64 \
-tcp_wrappers-libs.x86_64 tomcat6-servlet-2.5-api.noarch tzdata.noarch tzdata-java.noarch \
-udev.x86_64 unzip.x86_64 upstart.x86_64 usermode.x86_64 ustr.x86_64 util-linux-ng.x86_64 \
-vblade.x86_64 vconfig.x86_64 velocity.noarch vgabios.noarch vim-minimal.x86_64 vtun.x86_64 \
-werken-xpath.noarch wget.x86_64 which.x86_64 wireless-tools.x86_64 wsdl4j.noarch xalan-j2.noarch \
-xinetd.x86_64 xml-commons-apis.x86_64 xml-commons-resolver.x86_64 xz.x86_64 xz-libs.x86_64 \
-yajl.x86_64 yum.noarch yum-metadata-parser.x86_64 yum-plugin-fastestmirror.noarch \
-zd1211-firmware.noarch zip.x86_64 zlib.x86_64"
+mingetty.x86_64 module-init-tools.x86_64 mx4j.noarch mysql-libs.x86_64 nc.x86_64 ncurses.x86_64 \
+ncurses-base.x86_64 ncurses-libs.x86_64 net-tools.x86_64 netcf-libs.x86_64 newt.x86_64 \
+newt-python.x86_64 nfs-utils.x86_64 nfs-utils-lib.x86_64 nspr.x86_64 nss.x86_64 nss-softokn.x86_64 \
+nss-softokn-freebl.i686 nss-softokn-freebl.x86_64 nss-sysinit.x86_64 nss-util.x86_64 ntp.x86_64 \
+ntpdate.x86_64 numactl.x86_64 openldap.x86_64 openssh.x86_64 openssh-clients.x86_64 \
+openssh-server.x86_64 openssl.x86_64 pam.x86_64 pango.x86_64 parted.x86_64 passwd.x86_64 \
+pciutils.x86_64 pciutils-libs.x86_64 pcre.x86_64 perl.x86_64 perl-Config-General.noarch \
+perl-Crypt-OpenSSL-Bignum.x86_64 perl-Crypt-OpenSSL-Random.x86_64 perl-Crypt-OpenSSL-RSA.x86_64 \
+perl-libs.x86_64 perl-Module-Pluggable.x86_64 perl-Pod-Escapes.x86_64 perl-Pod-Simple.x86_64 \
+perl-version.x86_64 pinentry.x86_64 pixman.x86_64 pkgconfig.x86_64 plymouth.x86_64 \
+plymouth-core-libs.x86_64 plymouth-scripts.x86_64 policycoreutils.x86_64 polkit.x86_64 popt.x86_64 \
+postfix.x86_64 procps.x86_64 psmisc.x86_64 pth.x86_64 pulseaudio-libs.x86_64 pygpgme.x86_64 \
+python.x86_64 python-boto.noarch python-ethtool.x86_64 python-eucadmin.noarch \
+python-iniparse.noarch python-iwlib.x86_64 python-libs.x86_64 python-pycurl.x86_64 \
+python-urlgrabber.noarch qemu-img.x86_64 qemu-kvm.x86_64 ql2100-firmware.noarch \
+ql2200-firmware.noarch ql23xx-firmware.noarch ql2400-firmware.noarch ql2500-firmware.noarch \
+radvd.x86_64 rampartc.x86_64 readline.x86_64 redhat-logos.noarch regexp.x86_64 rhino.noarch \
+rootfiles.noarch rpcbind.x86_64 rpm.x86_64 rpm-libs.x86_64 rpm-python.x86_64 rsync.x86_64 \
+rsyslog.x86_64 rt61pci-firmware.noarch rt73usb-firmware.noarch scsi-target-utils.x86_64 \
+seabios.x86_64 sed.x86_64 selinux-policy.noarch setup.noarch sgabios-bin.noarch shadow-utils.x86_64 \
+sinjdoc.x86_64 slang.x86_64 spice-server.x86_64 sqlite.x86_64 sudo.x86_64 \
+system-config-network-tui.noarch sysvinit-tools.x86_64 tar.x86_64 tcp_wrappers-libs.x86_64 \
+tomcat6-servlet-2.5-api.noarch tzdata.noarch tzdata-java.noarch udev.x86_64 unzip.x86_64 \
+upstart.x86_64 usermode.x86_64 ustr.x86_64 util-linux-ng.x86_64 vblade.x86_64 vconfig.x86_64 \
+velocity.noarch vgabios.noarch vim-minimal.x86_64 vtun.x86_64 werken-xpath.noarch wget.x86_64 \
+which.x86_64 wireless-tools.x86_64 wsdl4j.noarch xalan-j2.noarch xinetd.x86_64 \
+xml-commons-apis.x86_64 xml-commons-resolver.x86_64 xz.x86_64 xz-libs.x86_64 yajl.x86_64 yum.noarch \
+yum-metadata-parser.x86_64 yum-plugin-fastestmirror.noarch zd1211-firmware.noarch zip.x86_64 \
+zlib.x86_64"
   ;;
 esac
 
-# Download the rpms
+# Download the base rpms
 cd ${BUILDDIR}/isolinux/${PACKAGESDIR}
 echo "$(date) - Retrieving packages" | tee -a $SILVEREYELOGFILE
 yumdownloader ${RPMS}
+
+# Download rpms that vary according to Eucalyptus version
+case "$EUCALYPTUSVERSION" in
+"3.0")
+  yumdownloader eucalyptus-broker.x86_64 eucalyptus-release-enterprise.noarch mysql.x86_64
+  ;;
+"3-devel")
+  yumdownloader compat-libevent14.x86_64 eucalyptus-nightly-release.noarch pgdg-centos91.noarch postgresql-libs.x86_64 postgresql91.x86_64 postgresql91-libs.x86_64 postgresql91-server.x86_64 PyGreSQL.x86_64
+  if [ $ELVERSION -eq 5 ] ; then
+    yumdownloader compat-rebuild-security-providers.noarch python26-PyGreSQL.x86_64
+  fi
+  ;;
+esac
 
 # Download the Eucalyptus release repository rpm
 case "$EUCALYPTUSVERSION" in
 "3.0")
   yumdownloader eucalyptus-release-enterprise.noarch
   ;;
-"3.1")
-  yumdownloader eucalyptus-nightly-release.noarch
+"3-devel")
+  yumdownloader eucalyptus-nightly-release.noarch pgdg-centos91.noarch
   ;;
 esac
 
