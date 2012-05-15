@@ -27,7 +27,8 @@
 # present on the system this script will install/create them.
 #
 #
-# If you have a local mirror that you prefer to use, uncomment the line(s) below.
+# If you have a local mirror that you prefer to use, modify and uncomment the
+# line(s) below.
 #CENTOSMIRROR="http://10.1.1.240/centos/"
 #EPELMIRROR="http://10.1.1.240/epel/"
 #ELREPOMIRROR="http://10.1.1.240/elrepo/"
@@ -137,10 +138,10 @@ case "$ELVERSION" in
   PACKAGESDIR="CentOS"
   ;;
 "6")
-  PACKAGESDIR="Packages"
+  PACKAGESDIR="CentOS"
   ;;
 *)
-  echo "$(date)- Error: This script must be run on CentOS version 5 or 6" |tee -a $SILVEREYELOGFILE
+  echo "$(date)- Error: This script must be run on CentOS version 5 or 6" | tee -a $SILVEREYELOGFILE
   exit 1
   ;;
 esac
@@ -270,11 +271,11 @@ eucalyptus-cc
 eucalyptus-walrus
 eucalyptus-sc
 euca2ools
+euca2ools-release
 
 %post --log=/root/frontend-ks-post.log
 # Disable SELinux
-sed -i -e 's/SELINUX=enforcing/SELINUX=disabled/' /etc/sysconfig/selinux
-sed -i -e 's/^\(\tkernel.*\)$/\0 selinux=0/' /boot/grub/grub.conf
+sed -i -e 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
 
 # Set the default Eucalyptus networking mode
 sed -i -e 's/^VNET_MODE=\"SYSTEM\"/VNET_MODE=\"MANAGED-NOVLAN"/' /etc/eucalyptus/eucalyptus.conf
@@ -289,7 +290,7 @@ REPLACEMEENTERPRISEPRIVATEKEY
 REPLACEMEEUCAGPGKEY
 
 # Create eucalyptus-frontend-config.sh script
-cat >> /usr/local/sbin/eucalyptus-frontend-config.sh <<"EOF"
+cat >> /usr/local/sbin/eucalyptus-frontend-config.sh <<"EOFFRONTENDCONFIG"
 #!/bin/bash
 #
 # Copyright (c) 2012  Eucalyptus Systems, Inc.
@@ -384,9 +385,11 @@ sed -i -e 's/NM_CONTROLLED=yes/NM_CONTROLLED=no/' /etc/sysconfig/network-scripts
 # Ask user to reconfigure networking if no static IP address settings are detected
 STATICIPS=`grep IPADDR /etc/sysconfig/network-scripts/ifcfg-* | grep -v 127.0.0.1 | wc -l`
 if [ $STATICIPS -lt 1 ] ; then
-  echo "It looks like none of your network interfaces are configured with static IP addresses."
+  echo "It looks like none of your network interfaces are configured with static IP"
+  echo "addresses."
   echo ""
-  echo "It is recommended that you use static IP addressing for configuring the network interfaces on your Eucalyptus infrastructure servers."
+  echo "It is recommended that you use static IP addressing for configuring the network"
+  echo "interfaces on your Eucalyptus infrastructure servers."
   echo ""
   while ! echo "$CONFIGURE_NETWORKING" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
     read -p "Would you like to reconfigure your network settings now? " CONFIGURE_NETWORKING
@@ -484,7 +487,8 @@ while ! echo "$CONFIGURE_HOSTNAME" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null
     esac
 done
 
-# Set VNET_PUBINTERFACE and VNET_PRIVINTERFACE with default values if the current values don't have IP addresses assigned to them
+# Set VNET_PUBINTERFACE and VNET_PRIVINTERFACE with default values if the
+# current values don't have IP addresses assigned to them
 DEFAULTROUTEINTERFACE=`route -n | grep '^0.0.0.0' | awk '{ print $NF }'`
 EUCACONF_PUBINTERFACE=`grep '^VNET_PUBINTERFACE' /etc/eucalyptus/eucalyptus.conf | sed -e 's/VNET_PUBINTERFACE=\"\(.*\)\"/\1/'`
 EUCACONF_PRIVINTERFACE=`grep '^VNET_PRIVINTERFACE' /etc/eucalyptus/eucalyptus.conf | sed -e 's/VNET_PRIVINTERFACE=\"\(.*\)\"/\1/'`
@@ -501,15 +505,18 @@ fi
 echo ""
 echo "It is important that time is synchronized across your Eucalyptus infrastructure."
 echo ""
-echo "The recommended way to ensure time remains synchronized is to enable the NTP service, which synchronizes time with Internet servers."
+echo "The recommended way to ensure time remains synchronized is to enable the NTP"
+echo "service, which synchronizes time with Internet servers."
 echo ""
-echo "If your systems have Internet access, and you would like to use NTP to synchronize their clocks with the default pool.ntp.org servers, please answer yes."
+echo "If your systems have Internet access, and you would like to use NTP to"
+echo "synchronize their clocks with the default pool.ntp.org servers, please answer"
+echo "yes."
 echo ""
 while ! echo "$ENABLE_NTP_SYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
-  read -p "Enable NTP and synchronize clock? " ENABLE_NTP_SYNC
+  read -p "Would you like to enable NTP and synchronize clock? " ENABLE_NTP_SYNC
   case "$ENABLE_NTP_SYNC" in
   y|Y|yes|YES|Yes)
-    echo "$(date)- Setting clock via NTP.  This may take a few minutes." |tee -a $LOGFILE
+    echo "$(date)- Setting clock via NTP.  This may take a few minutes." | tee -a $LOGFILE
     if [ -f /var/run/ntpd.pid ] ; then
       service ntpd stop
     fi
@@ -518,7 +525,7 @@ while ! echo "$ENABLE_NTP_SYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; 
     chkconfig ntpd on >>$LOGFILE 2>&1
     service ntpd start >>$LOGFILE 2>&1
     error_check
-    echo "$(date)- Set clock and enabled ntp" |tee -a $LOGFILE
+    echo "$(date)- Set clock and enabled ntp" | tee -a $LOGFILE
     ;;
   n|N|no|NO|No)
     echo "$(date)- Skipped NTP configuration and syncrhonization." | tee -a $LOGFILE
@@ -534,17 +541,17 @@ echo ""
 if [ ! -f /root/.ssh/id_rsa ]
 then
   ssh-keygen -N "" -f /root/.ssh/id_rsa >>$LOGFILE 2>&1
-  echo "$(date)- Generated root's SSH keys" |tee -a $LOGFILE
+  echo "$(date)- Generated root's SSH keys" | tee -a $LOGFILE
 else
-  echo "$(date)- root's SSH keys already exist" |tee -a $LOGFILE
+  echo "$(date)- root's SSH keys already exist" | tee -a $LOGFILE
 fi
 SSH_HOSTNAME=`hostname`
 if ! grep "root@${SSH_HOSTNAME}" /root/.ssh/authorized_keys > /dev/null 2>&1
 then
   cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys
-  echo "$(date)- Appended root's public key to authorized_keys" |tee -a $LOGFILE
+  echo "$(date)- Appended root's public key to authorized_keys" | tee -a $LOGFILE
 else
-  echo "$(date)- root's public key already present in authorized_keys" |tee -a $LOGFILE
+  echo "$(date)- root's public key already present in authorized_keys" | tee -a $LOGFILE
 fi
 
 # populate the SSH known_hosts file
@@ -552,18 +559,19 @@ for FEIP in `ip addr show |grep inet |grep global|awk -F"[\t /]*" '{ print $3 }'
   ssh -o StrictHostKeyChecking=no $FEIP "true"
 done
 
-# Edit the default eucalyptus.conf, insert default values if no previous configuration is present
+# Edit the default eucalyptus.conf, insert default values if no previous
+# configuration is present
 if ! grep -E '(^VNET_MODE)' /etc/eucalyptus/eucalyptus.conf > /dev/null
 then
   echo 'VNET_MODE="MANAGED-NOVLAN"' >> /etc/eucalyptus/eucalyptus.conf
 fi
 if ! grep -E '(^VNET_SUBNET)' /etc/eucalyptus/eucalyptus.conf > /dev/null
 then
-  echo 'VNET_SUBNET="192.168.0.0"' >> /etc/eucalyptus/eucalyptus.conf
+  echo 'VNET_SUBNET="172.16.0.0"' >> /etc/eucalyptus/eucalyptus.conf
 fi
 if ! grep -E '(^VNET_NETMASK)' /etc/eucalyptus/eucalyptus.conf > /dev/null
 then
-  echo 'VNET_NETMASK="255.255.255.0"' >> /etc/eucalyptus/eucalyptus.conf
+  echo 'VNET_NETMASK="255.255.0.0"' >> /etc/eucalyptus/eucalyptus.conf
 fi
 if ! grep -E '(^VNET_DNS)' /etc/eucalyptus/eucalyptus.conf > /dev/null
 then
@@ -572,7 +580,7 @@ then
 fi
 if ! grep -E '(^VNET_ADDRSPERNET)' /etc/eucalyptus/eucalyptus.conf > /dev/null
 then
-  echo 'VNET_ADDRSPERNET="32"' >> /etc/eucalyptus/eucalyptus.conf
+  echo 'VNET_ADDRSPERNET="64"' >> /etc/eucalyptus/eucalyptus.conf
 fi
 if ! grep -E '(^VNET_PUBLICIPS)' /etc/eucalyptus/eucalyptus.conf > /dev/null
 then
@@ -585,28 +593,30 @@ echo "We need some network information"
 EUCACONFIG=/etc/eucalyptus/eucalyptus.conf
 edit_prop VNET_PUBINTERFACE "The public ethernet interface" $EUCACONFIG
 edit_prop VNET_PRIVINTERFACE "The private ethernet interface" $EUCACONFIG
+edit_prop VNET_DNS "The DNS server address" $EUCACONFIG "[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}"
 edit_prop VNET_SUBNET "Eucalyptus-only dedicated subnet" $EUCACONFIG "[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}"
 edit_prop VNET_NETMASK "Eucalyptus subnet netmask" $EUCACONFIG "[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}"
-edit_prop VNET_DNS "The DNS server address" $EUCACONFIG "[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}"
 SUBNET_VAL=`grep VNET_NETMASK $EUCACONFIG|tail -1|cut -d '=' -f 2|tr -d "\""`
 ZERO_OCTETS=`echo $SUBNET_VAL |tr "." "\n" |grep 0 |wc -l`
 ADDRSPER_REC=32
 if [ $ZERO_OCTETS -eq "3" ]	# class A subnet
 then
-  ADDRSPER_REC=64
+  ADDRSPER_REC=128
 elif [ $ZERO_OCTETS -eq "2" ] # class B subnet
 then
-  ADDRSPER_REC=32
+  ADDRSPER_REC=64
 elif [ $ZERO_OCTETS -eq "1" ] # class C subnet
 then
-  ADDRSPER_REC=16
+  ADDRSPER_REC=32
 fi
 echo "Based on the size of your private subnet, we recommend the next value be set to $ADDRSPER_REC"
 sed --in-place "s/VNET_ADDRSPERNET=\"32\"/VNET_ADDRSPERNET=\"${ADDRSPER_REC}\"/" /etc/eucalyptus/eucalyptus.conf >>$LOGFILE 2>&1
 edit_prop VNET_ADDRSPERNET "How many addresses per net?" $EUCACONFIG "[0-9]*"
 echo ""
-echo "The range of public IP addresses should be two IP adresses on the public network separated by a - (e.g. '192.168.1.10-192.168.1.50')"
-echo "Other public IP address configurations are possible by manually editing your configuration later.  Please read the notes in /etc/eucalyptus/eucalyptus.conf"
+echo "The range of public IP addresses should be two IP adresses on the public"
+echo "network separated by a - (e.g. '192.168.1.10-192.168.1.50')"
+echo "Other public IP address configurations are possible by manually editing your"
+echo "configuration later.  Please read the notes in /etc/eucalyptus/eucalyptus.conf"
 edit_prop VNET_PUBLICIPS "The range of public IP addresses" $EUCACONFIG "[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}-[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}"
 
 # If we are running in MANAGED mode, make sure that our private interface is a bridge
@@ -697,13 +707,13 @@ fi
 
 # Initialize the CLC if there is no existing cloud-cert.pem
 if [ ! -f /var/lib/eucalyptus/keys/cloud-cert.pem ] ; then
-  echo "$(date)- Initializing Cloud Controller " |tee -a $LOGFILE
+  echo "$(date)- Initializing Cloud Controller " | tee -a $LOGFILE
   /usr/sbin/euca_conf --initialize
 fi
 
 # Start Eucalyptus services prior to registration
 echo ""
-echo "$(date)- Starting services " |tee -a $LOGFILE
+echo "$(date)- Starting services " | tee -a $LOGFILE
 if [ ! -f /var/run/eucalyptus/eucalyptus-cloud.pid ] ; then
   service eucalyptus-cloud start >> $LOGFILE 2>&1
 fi
@@ -722,10 +732,10 @@ else
 fi
 /sbin/chkconfig eucalyptus-cc on >> $LOGFILE 2>&1
 error_check
-echo "$(date)- Started services " |tee -a $LOGFILE
+echo "$(date)- Started services " | tee -a $LOGFILE
 
 # Prepare to register components
-echo "$(date)- Registering components " |tee -a $LOGFILE
+echo "$(date)- Registering components " | tee -a $LOGFILE
 curl http://localhost:8443/ >/dev/null 2>&1
 while [ $? -ne 0 ]
 do
@@ -748,14 +758,15 @@ if [ $private_ip ]
 then
   export PRIVATE_IP_ADDRESS=$private_ip
 fi
-echo "using public IP $PUBLIC_IP_ADDRESS and private IP $PRIVATE_IP_ADDRESS to register components" |tee -a $LOGFILE
+echo "Using public IP $PUBLIC_IP_ADDRESS and private IP $PRIVATE_IP_ADDRESS to" | tee -a $LOGFILE
+echo "register components" | tee -a $LOGFILE
 
 # Register Walrus
 if [ `/usr/sbin/euca_conf --list-walruses 2>/dev/null |wc -l` -eq '0' ]
 then
-  /usr/sbin/euca_conf --register-walrus --partition walrus --host $PUBLIC_IP_ADDRESS --component=walrus |tee -a $LOGFILE 
+  /usr/sbin/euca_conf --register-walrus --partition walrus --host $PUBLIC_IP_ADDRESS --component=walrus | tee -a $LOGFILE 
 else
-  echo "Walrus already registered. Will not re-register walrus" |tee -a $LOGFILE
+  echo "Walrus already registered. Will not re-register walrus" | tee -a $LOGFILE
 fi
 
 # Deregister previous SCs and clusters
@@ -773,8 +784,8 @@ do
 done
 
 # Now register clusters and SCs
-/usr/sbin/euca_conf --register-cluster --partition $CLUSTER_NAME --host $PUBLIC_IP_ADDRESS --component=cc_01 |tee -a $LOGFILE
-/usr/sbin/euca_conf --register-sc --partition $CLUSTER_NAME --host $PRIVATE_IP_ADDRESS --component=sc_01 |tee -a $LOGFILE
+/usr/sbin/euca_conf --register-cluster --partition $CLUSTER_NAME --host $PUBLIC_IP_ADDRESS --component=cc_01 | tee -a $LOGFILE
+/usr/sbin/euca_conf --register-sc --partition $CLUSTER_NAME --host $PRIVATE_IP_ADDRESS --component=sc_01 | tee -a $LOGFILE
 error_check
 
 # Deregister previous node controllers
@@ -785,7 +796,8 @@ done
 
 # Register node controllers
 echo ""
-echo "Ready to register node controllers. Once they are installed, enter their IP addresses here, one by one (ENTER when done)"
+echo "Ready to register node controllers. Once they are installed, enter their IP"
+echo "addresses here, one by one (ENTER when done)"
 done="not"
 while [ $done != "done" ]
 do
@@ -799,17 +811,256 @@ do
     echo "Please enter the root password of the node controller when prompted"
     scp -rp /root/.ssh root@${node}:/root/
     ssh root@${node} "service eucalyptus-nc restart"
-    /usr/sbin/euca_conf --register-nodes $node |tee -a $LOGFILE
+    /usr/sbin/euca_conf --register-nodes $node | tee -a $LOGFILE
   fi
 done
 error_check
-echo "$(date)- Registered components " |tee -a $LOGFILE
+echo "$(date)- Registered components " | tee -a $LOGFILE
 echo ""
+}
+
+# Function to retrieve cloud admin credentials
+function get_credentials {
+  if [ ! -f /root/credentials/admin/eucarc ] ; then
+    mkdir -p /root/credentials/admin | tee -a $LOGFILE
+    cd /root/credentials/admin
+    euca_conf --get-credentials admin.zip | tee -a $LOGFILE
+    unzip admin.zip | tee -a $LOGFILE
+    source eucarc
+    euca-add-keypair admin > admin.private
+    cd /root
+    ln -s /root/credentials/admin/eucarc .eucarc
+    chmod -R go-rwx credentials | tee -a $LOGFILE
+    chmod go-rwx .eucarc | tee -a $LOGFILE
+  fi
+}
+
+# Function to create instance store-backed EMI
+function create_emi {
+  CDNOTMOUNTED=`ls /media/cdrom/repodata/repomd.xml > /dev/null 2>&1 ; echo $?`
+  while [ $CDNOTMOUNTED -ne 0 ] ; do
+    read -p "Please insert your Eucalyptus installation CD and press ENTER: "
+    sleep 5
+    mkdir -p /media/cdrom
+    mount /dev/cdrom /media/cdrom
+    CDNOTMOUNTED=`ls /media/cdrom/repodata/repomd.xml > /dev/null 2>&1 ; echo $?`
+    if [ $CDNOTMOUNTED -ne 0 ] ; then
+      echo "Unable to locate Eucalyptus installation CD.  Press Ctrl-C to abort."
+      echo ""
+    fi
+  done
+  IMAGESIZE=""
+  while ! echo "$IMAGESIZE" | grep -iE '(^small$|^medium$|^large$)' > /dev/null ; do
+    echo "There are several instance types available, each with different virtual disk"
+    echo "sizes."
+    echo ""
+    echo "The default instance type/disk sizes are:"
+    echo "small:   2 GB"
+    echo "medium:  5 GB"
+    echo "large:  10 GB"
+    echo ""
+    echo "EMIs with larger root filesystems may take longer to launch, but provide more"
+    echo "storage for the root partition."
+    echo "EMIs with smaller root filesystems may launch quicker, but have limited storage"
+    echo "for the root filesystem."
+    echo ""
+    echo "You will not be able to run an EMI unless the instance type provides enough"
+    echo "storage for the root filesystem."
+    echo "i.e. If you attempt to run a large EMI using a small instance type, it will"
+    echo "fail to launch."
+    echo ""
+    echo "When you launch an instance, any storage provided by the instance type that is"
+    echo "greater than the root filesystem + 512 MB swap is allocated as an 'ephemeral'"
+    echo "storage partition."
+    echo ""
+    read -p "Would you like to create a small, medium, or large root filesystem for your EMI? " IMAGESIZE
+    case "$IMAGESIZE" in
+    "small")
+      SEEKBLOCKS=1533
+    ;;
+    "medium")
+      SEEKBLOCKS=4605
+    ;;
+    "large")
+      SEEKBLOCKS=9725
+    ;;
+    *)
+      echo "Please enter 'small', 'medium', or 'large'."
+    ;;
+    esac
+  done 
+  echo "$(date)- Creating and mounting disk image file." | tee -a $LOGFILE
+  dd if=/dev/zero of=centos-${ELVERSION}-x86_64-${IMAGESIZE}.img bs=1M count=1 seek=${SEEKBLOCKS}
+  parted centos-${ELVERSION}-x86_64-${IMAGESIZE}.img mklabel msdos
+  mkfs.ext3 -F -L root centos-${ELVERSION}-x86_64-${IMAGESIZE}.img
+  losetup -f centos-${ELVERSION}-x86_64-${IMAGESIZE}.img
+  IMAGELOOPDEVICE=`losetup -a | grep -E "centos-${ELVERSION}-x86_64-${IMAGESIZE}.img" | awk '{print $1}' | sed 's/://g'`
+  mkdir -p /mnt/image
+  mount ${IMAGELOOPDEVICE} /mnt/image
+  mkdir -p /mnt/image/{proc,etc,dev,var/{cache,log,lock}}
+  MAKEDEV -d /mnt/image/dev -x console
+  MAKEDEV -d /mnt/image/dev -x null
+  MAKEDEV -d /mnt/image/dev -x zero
+  mount -t proc none /mnt/image/proc
+  cat > /mnt/image/etc/fstab << EOF
+LABEL=root    /        ext3   defaults       1 1
+none          /dev/pts devpts gid=5,mode=620 0 0
+none          /dev/shm tmpfs  defaults       0 0
+none          /proc    proc   defaults       0 0
+none          /sys     sysfs  defaults       0 0
+EOF
+  echo "$(date)- Installing packages in image." | tee -a $LOGFILE
+  case "$ELVERSION" in
+  "5")
+    yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ groupinstall 'Core'
+    yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl euca2ools euca2ools-release iptables iptables-ipv6 kernel-xen mdadm ntp openssh-clients parted selinux-policy unzip wget which zip
+    # Super minimal package set only.  Breakage may occur.
+    # yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl dhclient e2fsprogs euca2ools euca2ools-release grub iptables iptables-ipv6 kernel-xen logrotate lvm2 mdadm ntp openssh-clients openssh-server parted passwd policycoreutils rootfiles selinux-policy shadow-utils unzip vim-minimal vixie-cron wget which yum zip
+  ;;
+  "6")
+    yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ groupinstall 'Core'
+    yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl euca2ools euca2ools-release iptables iptables-ipv6 kernel mdadm ntp openssh-clients parted selinux-policy unzip wget which zip
+    # Super minimal package set only.  Breakage may occur.
+    # yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 cronie curl dhclient e2fsprogs euca2ools euca2ools-release grub iptables iptables-ipv6 kernel logrotate lvm2 mdadm ntp openssh-clients openssh-server parted passwd policycoreutils rootfiles selinux-policy shadow-utils unzip vim-minimal wget which yum zip
+  ;;
+  esac
+  echo "$(date)- Creating configuration files and scripts in image." | tee -a $LOGFILE
+  sed -i -e 's/SELINUX=enforcing/SELINUX=disabled/' /mnt/image/etc/selinux/config
+  touch /mnt/image/.autorelabel
+  cat > /mnt/image/etc/sysconfig/network << EOF
+NETWORKING=yes
+NOZEROCONF=yes
+EOF
+  cat > /mnt/image/etc/sysconfig/network-scripts/ifcfg-eth0 << EOF
+ONBOOT=yes
+DEVICE=eth0
+BOOTPROTO=dhcp
+EOF
+  cat > /mnt/image/etc/rc.d/rc.local << "EOF"
+#!/bin/sh -e
+#
+# rc.local
+#
+# This script is executed at the end of each multiuser runlevel.
+# Make sure that the script will "exit 0" on success or any other
+# value on error.
+#
+# In order to enable or disable this script just change the execution
+# bits.
+#
+
+# since ephemeral or swap may not be mounted or on different devices
+# (specially on xen) let's look for them. This is fairly hackish.
+if ! swapon -s|grep partition > /dev/null ; then
+# no swap partition
+for x in `ls /dev/[xvsh]*d[a-z]3` ; do
+swapon $x 2> /dev/null
+done
+fi
+if ! mount | cut -f 1 -d ' '|grep /dev|grep 2 > /dev/null ; then
+mkdir -p /media/ephemeral0
+if [ -d /media/ephemeral0 ]; then
+if [ -z "`ls /media/ephemeral0/*`" ]; then
+# try to mount only if the mount point is empty
+for x in `ls /dev/[xvsh]*d[a-z]2` ; do
+mount $x /media/ephemeral0 2> /dev/null
+done
+fi
+fi
+fi
+
+# load pci hotplug for dynamic disk attach in KVM (for EBS)
+depmod -a
+modprobe acpiphp || true
+
+# simple attempt to get the user ssh key using the meta-data service
+mkdir -p /root/.ssh
+echo >> /root/.ssh/authorized_keys
+curl --retry 3 --retry-delay 10 -m 45 -s http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key | grep 'ssh-rsa' >> /root/.ssh/authorized_keys
+echo "AUTHORIZED_KEYS:"
+echo "************************"
+cat /root/.ssh/authorized_keys
+echo "************************"
+
+# set the hostname to something sensible
+META_HOSTNAME="`curl -s http://169.254.169.254/latest/meta-data/local-hostname`"
+META_IP="`curl -s http://169.254.169.254/latest/meta-data/local-ipv4`"
+
+if [ ${META_HOSTNAME} = ${META_IP} ]; then
+        META_HOSTNAME="`echo $META_HOSTNAME | sed -e 's/\./-/g' | xargs -I {} echo "ip-{}"`"
+fi
+
+hostname $META_HOSTNAME
+echo >> /etc/hosts
+echo "${META_IP} ${META_HOSTNAME}" >> /etc/hosts
+
+
+# check if the user-data is a script, and if so execute it
+TMP_FILE="/tmp/user-data-$$"
+curl --retry 3 --retry-delay 10 -m 60 -o $TMP_FILE http://169.254.169.254/latest/user-data
+if [ -s $TMP_FILE ]; then
+echo "Downloaded user data in $TMP_FILE"
+if [ "`head -c 2 $TMP_FILE`" = '#!' ]; then
+chmod 700 $TMP_FILE
+echo "User data is a script: executing it"
+$TMP_FILE > /root/user-data.out 2>&1
+fi
+fi
+
+exit 0
+EOF
+  echo "$(date)- Generating and setting random root password." | tee -a $LOGFILE
+  chroot /mnt/image authconfig --enableshadow --passalgo=sha512 --updateall
+  dd if=/dev/urandom bs=1M count=1 2>/dev/null | sha512sum | awk '{print $1}' | chroot /mnt/image passwd --stdin root
+  echo "$(date)- Disabling iptables in image." | tee -a $LOGFILE
+  chroot /mnt/image chkconfig iptables off
+  chroot /mnt/image chkconfig ip6tables off
+  case "$ELVERSION" in
+  "5")
+    echo "$(date)- Generating ramdisk and copying kernel from Node Controller." | tee -a $LOGFILE
+    TEMPNODE=`euca_conf --list-nodes | awk '{print $2}' | head -n 1`
+    scp ${TEMPNODE}:/boot/vmlinuz* ./
+    ssh ${TEMPNODE} 'mkinitrd --omit-scsi-modules --with=xennet --with=xenblk --preload=xenblk /tmp/initrd-$(uname -r).img $(uname -r)'
+    scp ${TEMPNODE}:/tmp/initrd-* ./
+    ssh ${TEMPNODE} "rm -f /tmp/initrd-*"
+  ;;
+  "6")
+    echo "$(date)- Copying kernel and ramdisk from image." | tee -a $LOGFILE
+    cp /mnt/image/boot/vmlinuz-* ./
+    cp /mnt/image/boot/init* ./
+  ;;
+  esac
+  echo "$(date)- Unmounting Eucalyptus installation CD and image file." | tee -a $LOGFILE
+  sync
+  umount /media/cdrom
+  rm -rf /media/cdrom
+  umount /mnt/image/proc
+  umount /mnt/image
+  rm -rf /mnt/image
+  losetup -d $IMAGELOOPDEVICE
+  echo "$(date)- Creating EMI." | tee -a $LOGFILE
+  IMAGENAME=`ls centos*.img | sed -e 's/\.img$//'`
+  KERNELIMAGE=`ls vmlinuz*`
+  INITRDIMAGE=`ls init*`
+  echo "$(date)- Bundling, uploading, and registering kernel image." | tee -a $LOGFILE
+  KERNELMANIFEST=`euca-bundle-image -i $KERNELIMAGE --kernel true | grep 'Generating manifest' | awk '{print $3}'`
+  KERNELUPLOADEDBUNDLE=`euca-upload-bundle -b $IMAGENAME -m $KERNELMANIFEST | grep 'Uploaded image as' | awk '{print $4}'`
+  KERNELEKI=`euca-register -n $KERNELIMAGE -a x86_64 --kernel true $KERNELUPLOADEDBUNDLE | awk '{print $2}'`
+  echo "$(date)- Bundling, uploading, and registering ramdisk image." | tee -a $LOGFILE
+  INITRDMANIFEST=`euca-bundle-image -i $INITRDIMAGE --ramdisk true | grep 'Generating manifest' | awk '{print $3}'`
+  INITRDUPLOADEDBUNDLE=`euca-upload-bundle -b $IMAGENAME -m $INITRDMANIFEST | grep 'Uploaded image as' | awk '{print $4}'`
+  INITRDERI=`euca-register -n $INITRDIMAGE -a x86_64 --ramdisk true $INITRDUPLOADEDBUNDLE | awk '{print $2}'`
+  echo "$(date)- Bundling, uploading and registering EMI." | tee -a $LOGFILE
+  EMIMANIFEST=`euca-bundle-image -i ${IMAGENAME}.img --kernel $KERNELEKI --ramdisk $INITRDERI | grep 'Generating manifest' | awk '{print $3}'`
+  EMIUPLOADEDBUNDLE=`euca-upload-bundle -b $IMAGENAME -m $EMIMANIFEST | grep 'Uploaded image as' | awk '{print $4}'`
+  EMI=`euca-register -n $IMAGENAME -a x86_64 --kernel $KERNELEKI --ramdisk $INITRDERI $EMIUPLOADEDBUNDLE  | awk '{print $2}'`
+  echo "$(date)- EMI image $EMI is ready to use." | tee -a $LOGFILE
+  rm -f ${IMAGENAME}.img $KERNELIMAGE $INITRDIMAGE
 }
 
 # Function for installing graphical desktop
 function install_desktop {
-  echo "$(date)- Installing graphical desktop.  This may take a few minutes." |tee -a $LOGFILE
+  echo "$(date)- Installing graphical desktop.  This may take a few minutes." | tee -a $LOGFILE
   echo ""
   case "$ELVERSION" in
   "5")
@@ -849,6 +1100,12 @@ Name[en_US]=Eucalyptus Web Admin
 DESKTOPSHORTCUT
   sed -i -e "s/REPLACE_PUBLIC_IP_ADDRESS/$PUBLIC_IP_ADDRESS/" /home/${LOCALUSER}/Desktop/Eucalyptus.desktop
   chown -R ${LOCALUSER}:${LOCALUSER} /home/${LOCALUSER}/Desktop
+  cp -a /root/credentials /home/${LOCALUSER}/
+  cd /home/${LOCALUSER}
+  ln -s credentials/admin/eucarc .eucarc
+  chown -R ${LOCALUSER}:${LOCALUSER} /home/${LOCALUSER}/credentials
+  chown -R ${LOCALUSER}:${LOCALUSER} /home/${LOCALUSER}/.eucarc
+  cd
   error_check
 }
 
@@ -856,7 +1113,8 @@ DESKTOPSHORTCUT
 echo ""
 echo "Welcome to the Eucalyptus frontend configuration script."
 echo ""
-echo "It is recommended that the Node Controllers are installed and configured prior to continuing this Frontend configuration."
+echo "It is recommended that the Node Controllers are installed and configured prior"
+echo "to continuing this Frontend configuration."
 echo ""
 CONFIGUREFRONTEND=""
 while ! echo "$CONFIGUREFRONTEND" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
@@ -873,6 +1131,36 @@ while ! echo "$CONFIGUREFRONTEND" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null 
   n|N|no|NO|No)
     echo "$(date)- Skipped Frontend configuration." | tee -a $LOGFILE
     echo ""
+    ;;
+  *)
+    echo "Please answer either 'yes' or 'no'."
+    ;;
+  esac
+done
+
+# Get the cloud admin's credentials
+get_credentials
+
+# Ask the user if they would like to create an EMI from the installation CD
+CREATEEMI=""
+while ! echo "$CREATEEMI" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
+echo "Virtual machine images (EMIs) are required to run instances in your cloud."
+echo ""
+echo "You can dowload starter images from http://emis.eucalyptus.com."
+echo ""
+echo "You can also create EMIs from the Eucalyptus installation CD."
+echo ""
+read -p "Would you like to create an EMI from the Eucalyptus installation CD? " CREATEEMI
+  case "$CREATEEMI" in
+  y|Y|yes|YES|Yes)
+    create_emi
+    error_check
+    CREATEEMI=""
+    echo "Answer 'no' when you are done creating EMIs."
+    echo ""
+    ;;
+  n|N|no|NO|No)
+    echo "$(date)- Skipped EMI creation." | tee -a $LOGFILE
     ;;
   *)
     echo "Please answer either 'yes' or 'no'."
@@ -927,7 +1215,8 @@ if [ $? -eq 0 ] ; then
   done
 fi
 
-echo "You can re-run this configuration scipt later by executing /usr/local/sbin/eucalyptus-frontend-config.sh as root."
+echo "You can re-run this configuration scipt later by executing"
+echo "/usr/local/sbin/eucalyptus-frontend-config.sh as root."
 echo ""
 case "$INSTALLDESKTOP" in
   y|Y|yes|YES|Yes)
@@ -941,7 +1230,7 @@ case "$INSTALLDESKTOP" in
     ;;
 esac
 
-EOF
+EOFFRONTENDCONFIG
 
 chmod 770 /usr/local/sbin/eucalyptus-frontend-config.sh
 
@@ -952,7 +1241,8 @@ chmod 770 /usr/local/sbin/eucalyptus-frontend-config.sh
 cp /etc/rc.d/rc.local /etc/rc.d/rc.local.orig
 cat >> /etc/rc.d/rc.local <<"EOF"
 
-# Add eucalyptus-frontend-config.sh script to root's .bash_profile, and have the original .bash_profile moved in on the first run
+# Add eucalyptus-frontend-config.sh script to root's .bash_profile, and have
+# the original .bash_profile moved in on the first run
 echo '/bin/cp -af /root/.bash_profile.orig /root/.bash_profile' >> /root/.bash_profile
 echo '/usr/local/sbin/eucalyptus-frontend-config.sh' >> /root/.bash_profile
 
@@ -988,14 +1278,15 @@ selinux-policy
 xen
 eucalyptus-nc
 euca2ools
+euca2ools-release
 -kernel
 
 %post --log=/root/nc-ks-post.log
 # Disable SELinux
-sed -i -e 's/SELINUX=enforcing/SELINUX=disabled/' /etc/sysconfig/selinux
-sed -i -e 's/^\(\tkernel.*\)$/\0 selinux=0/' /boot/grub/grub.conf
+sed -i -e 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
 
-# Workaround for grub not getting installed correctly on software RAID /boot partitions
+# Workaround for grub not getting installed correctly on software RAID /boot
+# partitions
 rpm -q kernel-xen > /dev/null
 if [ $? -eq 0 ] ; then
   if mount | grep -E '^/dev/md.*/boot' > /dev/null ; then
@@ -1106,9 +1397,11 @@ fi
 # Ask user to reconfigure networking if no static IP address settings are detected
 STATICIPS=`grep IPADDR /etc/sysconfig/network-scripts/ifcfg-* | grep -v 127.0.0.1 | wc -l`
 if [ $STATICIPS -lt 1 ] ; then
-  echo "It looks like none of your network interfaces are configured with static IP addresses."
+  echo "It looks like none of your network interfaces are configured with static IP"
+  echo "addresses."
   echo ""
-  echo "It is recommended that you use static IP addressing for configuring the network interfaces on your Eucalyptus infrastructure servers."
+  echo "It is recommended that you use static IP addressing for configuring the network"
+  echo "interfaces on your Eucalyptus infrastructure servers."
   echo ""
   while ! echo "$CONFIGURE_NETWORKING" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
     read -p "Would you like to reconfigure your network settings now? " CONFIGURE_NETWORKING
@@ -1205,7 +1498,8 @@ while ! echo "$CONFIGURE_HOSTNAME" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null
     esac
 done
 
-# Set VNET_PUBINTERFACE and VNET_PRIVINTERFACE with default values if the current values don't have IP addresses assigned to them
+# Set VNET_PUBINTERFACE and VNET_PRIVINTERFACE with default values if the
+# current values don't have IP addresses assigned to them
 DEFAULTROUTEINTERFACE=`route -n | grep '^0.0.0.0' | awk '{ print $NF }'`
 EUCACONF_PUBINTERFACE=`grep '^VNET_PUBINTERFACE' /etc/eucalyptus/eucalyptus.conf | sed -e 's/VNET_PUBINTERFACE=\"\(.*\)\"/\1/'`
 EUCACONF_PRIVINTERFACE=`grep '^VNET_PRIVINTERFACE' /etc/eucalyptus/eucalyptus.conf | sed -e 's/VNET_PRIVINTERFACE=\"\(.*\)\"/\1/'`
@@ -1222,15 +1516,18 @@ fi
 echo ""
 echo "It is important that time is synchronized across your Eucalyptus infrastructure."
 echo ""
-echo "The recommended way to ensure time remains synchronized is to enable the NTP service, which synchronizes time with Internet servers."
+echo "The recommended way to ensure time remains synchronized is to enable the NTP"
+echo "service, which synchronizes time with Internet servers."
 echo ""
-echo "If your systems have Internet access, and you would like to use NTP to synchronize their clocks with the default pool.ntp.org servers, please answer yes."
+echo "If your systems have Internet access, and you would like to use NTP to"
+echo "synchronize their clocks with the default pool.ntp.org servers, please answer"
+echo "yes."
 echo ""
 while ! echo "$ENABLE_NTP_SYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
   read -p "Enable NTP and synchronize clock? " ENABLE_NTP_SYNC
   case "$ENABLE_NTP_SYNC" in
   y|Y|yes|YES|Yes)
-    echo "$(date)- Setting clock via NTP.  This may take a few minutes." |tee -a $LOGFILE
+    echo "$(date)- Setting clock via NTP.  This may take a few minutes." | tee -a $LOGFILE
     if [ -f /var/run/ntpd.pid ] ; then
       service ntpd stop
     fi
@@ -1239,7 +1536,7 @@ while ! echo "$ENABLE_NTP_SYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; 
     chkconfig ntpd on >>$LOGFILE 2>&1
     service ntpd start >>$LOGFILE 2>&1
     error_check
-    echo "$(date)- Set clock and enabled ntp" |tee -a $LOGFILE
+    echo "$(date)- Set clock and enabled ntp" | tee -a $LOGFILE
     ;;
   n|N|no|NO|No)
     echo "$(date)- Skipped NTP configuration and syncrhonization." | tee -a $LOGFILE
@@ -1279,7 +1576,7 @@ case "$ELVERSION" in
   NC_BRIDGE="xenbr0"
   sed -i -e "s/.*VNET_BRIDGE=\".*\"/VNET_BRIDGE=\"$NC_BRIDGE\"/" /etc/eucalyptus/eucalyptus.conf
   # Edit the xen configuration files
-  echo "$(date) - Configuring xen" |tee -a $LOGFILE
+  echo "$(date) - Configuring xen" | tee -a $LOGFILE
   sed -i -e "s/.*(xend-http-server .*/(xend-http-server yes)/" /etc/xen/xend-config.sxp >>$LOGFILE 2>&1
   sed -i -e "s/.*(xend-address localhost)/(xend-address localhost)/" /etc/xen/xend-config.sxp >>$LOGFILE 2>&1
   sed -i -e "s/^(network-script network-bridge)/(network-script 'network-bridge netdev=$NC_PUBINTERFACE')/" /etc/xen/xend-config.sxp >>$LOGFILE 2>&1
@@ -1288,15 +1585,15 @@ case "$ELVERSION" in
   sed -i -e "s/.*XENCONSOLED_LOG_GUESTS.*/XENCONSOLED_LOG_GUESTS=yes/" /etc/sysconfig/xend >>$LOGFILE 2>&1
   service xend restart >>$LOGFILE 2>&1
   error_check
-  echo "$(date) - Customized xen configuration" |tee -a $LOGFILE
+  echo "$(date) - Customized xen configuration" | tee -a $LOGFILE
   # Edit the libvirt.conf file
-  echo "$(date) - Configuring libvirt " |tee -a $LOGFILE
+  echo "$(date) - Configuring libvirt " | tee -a $LOGFILE
   sed -i -e 's/.*unix_sock_group.*/unix_sock_group = "eucalyptus"/' /etc/libvirt/libvirtd.conf >>$LOGFILE 2>&1
   sed -i -e 's/.*unix_sock_ro_perms.*/unix_sock_ro_perms = "0777"/' /etc/libvirt/libvirtd.conf >>$LOGFILE 2>&1
   sed -i -e 's/.*unix_sock_rw_perms.*/unix_sock_rw_perms = "0770"/' /etc/libvirt/libvirtd.conf >>$LOGFILE 2>&1
   service libvirtd restart  >>$LOGFILE 2>&1
   error_check
-  echo "$(date) - Customized libvirt configuration" |tee -a $LOGFILE
+  echo "$(date) - Customized libvirt configuration" | tee -a $LOGFILE
   # Enable 256 loop devices
   if [ ! -f /etc/modprobe.d/eucalyptus-loop ] ; then
     echo "options loop max_loop=256" > /etc/modprobe.d/eucalyptus-loop
@@ -1333,7 +1630,7 @@ case "$ELVERSION" in
       sed -i -e "s/DEVICE=${NC_PUBINTERFACE}/DEVICE=${NC_BRIDGE}/" /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE}
       sed -i -e '/HWADDR=/d' /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE}
       sed -i -e 's/TYPE=Ethernet/TYPE=Bridge/g' /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE}
-      if ! grep -E 'TYPE' /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE} ; then
+      if ! grep -E 'TYPE' /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE} > /dev/null ; then
         echo "TYPE=Bridge" >> /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE}
       fi
       if ! grep -E 'DELAY' /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE} > /dev/null ; then
@@ -1393,9 +1690,11 @@ error_check
 error_check
 
 echo "This machine is ready and running as a Node Controller."
-echo "You can re-run this configuration scipt  later by executing /usr/local/sbin/eucalyptus-nc-config.sh as root."
+echo "You can re-run this configuration scipt  later by executing"
+echo "/usr/local/sbin/eucalyptus-nc-config.sh as root."
 echo ""
-echo "After all Node Controllers are installed and configured, install and configure your Frontend server."
+echo "After all Node Controllers are installed and configured, install and configure"
+echo "your Frontend server."
 
 if [ $ELVERSION -eq 5 ] ; then
   echo "Your system needs to reboot to complete configuration changes."
@@ -1414,7 +1713,8 @@ chmod 770 /usr/local/sbin/eucalyptus-nc-config.sh
 cp /etc/rc.d/rc.local /etc/rc.d/rc.local.orig
 cat >> /etc/rc.d/rc.local <<"EOF"
 
-# Add eucalyptus-nc-config.sh script to root's .bash_profile, and have the original .bash_profile moved in on the first run
+# Add eucalyptus-nc-config.sh script to root's .bash_profile, and have the
+# original .bash_profile moved in on the first run
 echo '/bin/cp -af /root/.bash_profile.orig /root/.bash_profile' >> /root/.bash_profile
 echo '/usr/local/sbin/eucalyptus-nc-config.sh' >> /root/.bash_profile
 
@@ -1455,7 +1755,8 @@ selinux --disabled
 
 EOFCOREKICKSTART
 
-# Customize kickstart files for CentOS 5 or CentOS 6, and Eucalyptus Enterprise or Open Source
+# Customize kickstart files for CentOS 5 or CentOS 6, and Eucalyptus Enterprise
+# or Open Source
 case "$ELVERSION" in
 "5")
   # sed -i -e '/%end/d' ${BUILDDIR}/isolinux/ks/*.cfg
@@ -1510,7 +1811,7 @@ if [ $? -eq 1 ] ; then
     wget ${EPELFETCHMIRROR}epel-release-5-4.noarch.rpm
     ;;
   "6")
-    wget ${EPELFETCHMIRROR}epel-release-6-5.noarch.rpm
+    wget ${EPELFETCHMIRROR}epel-release-6-6.noarch.rpm
     ;;
   esac
   rpm -Uvh epel-release-*.noarch.rpm
@@ -1550,7 +1851,8 @@ if [ -n "$ELREPOMIRROR" ] ; then
   sed -i -e "s%baseurl=http://elrepo.org/linux/elrepo/%baseurl=${ELREPOMIRROR}%g" /etc/yum.repos.d/elrepo.repo
 fi
 
-# Install/configure PostgreSQL repository if it's required, remove it if it's not required.
+# Install/configure PostgreSQL repository if it's required, remove it if it's
+# not required.
 case "$EUCALYPTUSVERSION" in
 "3.0")
   rpm -q pgdg-centos91 > /dev/null
@@ -1628,15 +1930,6 @@ EOF
   fi
   ;;
 "3-devel")
-  rpm -q pgdg-centos91 > /dev/null
-  if [ $? -eq 1 ] ; then
-    echo "$(date) - Installing PostgreSQL repository package" | tee -a $SILVEREYELOGFILE
-    wget http://yum.postgresql.org/9.1/redhat/rhel-${ELVERSION}-x86_64/pgdg-centos91-9.1-4.noarch.rpm
-    rpm -Uvh pgdg-centos91*.rpm
-    rm -f pgdg-centos91*.rpm
-  else
-    echo "$(date) - PostgreSQL repository package already installed" | tee -a $SILVEREYELOGFILE
-  fi
   rpm -q eucalyptus-nightly-release > /dev/null
   if [ $? -eq 1 ] ; then
     echo "$(date) - Installing Eucalyptus nightly repository package" | tee -a $SILVEREYELOGFILE
@@ -1662,159 +1955,205 @@ EOF
   ;;
 esac
 
-# Create euca2ools repository file
-echo "$(date) - Creating euca2ools repository" | tee -a $SILVEREYELOGFILE
-cat > /etc/yum.repos.d/euca2ools.repo << "EOF"
-[euca2ools]
-name=Euca2ools 2.0
-baseurl=https://downloads.eucalyptus.com/software/euca2ools/2.0/centos/$releasever/$basearch
-gpgkey=file:///etc/pki/rpm-gpg/eucalyptus-release-key.pub
-gpgcheck=1
-EOF
+# Install euca2ools repository
+rpm -q euca2ools-release > /dev/null
+if [ $? -eq 1 ] ; then
+  echo "$(date) - Installing euca2ools repository package" | tee -a $SILVEREYELOGFILE
+  wget http://downloads.eucalyptus.com/software/euca2ools/2.0/centos/${ELVERSION}/x86_64/euca2ools-release-2.0-1.el${ELVERSION}.noarch.rpm
+  rpm -Uvh euca2ools-release*.rpm
+  rm -f euca2ools-release*.rpm
+else
+  echo "$(date) - euca2ools repository package already installed" | tee -a $SILVEREYELOGFILE
+fi
 
-# Retrieve the RPMs for a minimal CentOS, Eucalyptus, and Eucalyptus dependencies
+# Retrieve the RPMs for CentOS, Eucalyptus, and dependencies
 # Set list of RPMs to download
 case "$ELVERSION" in
 "5")
-  RPMS="alsa-lib.x86_64 antlr.x86_64 apr.x86_64 apr-util.x86_64 atk.x86_64 audiofile.x86_64 \
-audit-libs.x86_64 audit-libs-python.x86_64 avahi.x86_64 avalon-framework.x86_64 \
-avalon-logkit.x86_64 axis.x86_64 axis2c.x86_64 basesystem.noarch bash.x86_64 bcel.x86_64 \
-binutils.x86_64 bitstream-vera-fonts.noarch bridge-utils.x86_64 bzip2.x86_64 bzip2-libs.x86_64 \
-cairo.x86_64 centos-release.x86_64 centos-release-notes.x86_64 chkconfig.x86_64 \
-classpathx-jaf.x86_64 classpathx-mail.x86_64 coreutils.x86_64 cpio.x86_64 cracklib.x86_64 \
-cracklib-dicts.x86_64 crontabs.noarch cryptsetup-luks.x86_64 cups-libs.x86_64 curl.x86_64 \
-cyrus-sasl.x86_64 cyrus-sasl-lib.x86_64 cyrus-sasl-md5.x86_64 db4.x86_64 dbus.x86_64 \
-dbus-glib.x86_64 dbus-libs.x86_64 dbus-python.x86_64 device-mapper.x86_64 \
-device-mapper-event.x86_64 device-mapper-multipath.x86_64 dhclient.x86_64 dhcp.x86_64 \
-diffutils.x86_64 dmidecode.x86_64 dmraid.x86_64 dmraid-events.x86_64 dnsmasq.x86_64 \
-drbd83-utils.x86_64 e2fsprogs.x86_64 e2fsprogs-libs.x86_64 e4fsprogs-libs.x86_64 ebtables.x86_64 \
-ed.x86_64 elfutils-libelf.x86_64 elrepo-release.noarch epel-release.noarch esound.x86_64 \
-ethtool.x86_64 euca2ools.noarch eucalyptus.x86_64 eucalyptus-admin-tools.x86_64 \
-eucalyptus-cc.x86_64 eucalyptus-cloud eucalyptus-common-java.x86_64 eucalyptus-gl.x86_64 \
-eucalyptus-nc.x86_64 eucalyptus-sc.x86_64 eucalyptus-walrus.x86_64 expat.x86_64 file.x86_64 \
-filesystem.x86_64 findutils.x86_64 fipscheck.x86_64 fipscheck-lib.x86_64 fontconfig.x86_64 \
-freetype.x86_64 fuse-libs.x86_64 gawk.x86_64 gdbm.x86_64 geronimo-specs.x86_64 \
-geronimo-specs-compat.x86_64 giflib.x86_64 gjdoc.x86_64 glib2.x86_64 glibc.i686 glibc.x86_64 \
-glibc-common.x86_64 gnutls.x86_64 grep.x86_64 grub.x86_64 gtk2.x86_64 gzip.x86_64 hal.x86_64 \
-hesiod.x86_64 hicolor-icon-theme.noarch hmaccalc.x86_64 httpd.x86_64 hwdata.noarch info.x86_64 \
-initscripts.x86_64 iproute.x86_64 iptables.x86_64 iptables-ipv6.x86_64 iputils.x86_64 \
-iscsi-initiator-utils.x86_64 jakarta-commons-collections.x86_64 jakarta-commons-discovery.x86_64 \
-jakarta-commons-httpclient.x86_64 jakarta-commons-logging.x86_64 jakarta-oro.x86_64 \
-java-1.4.2-gcj-compat.x86_64 java-1.6.0-openjdk.x86_64 jdom.x86_64 jpackage-utils.noarch kbd.x86_64 \
-kernel.x86_64 kernel-xen.x86_64 keyutils-libs.x86_64 kmod-drbd83.x86_64 kpartx.x86_64 \
-krb5-libs.x86_64 kudzu.x86_64 less.x86_64 libacl.x86_64 libart_lgpl.x86_64 libattr.x86_64 \
-libcap.x86_64 libdaemon.x86_64 libevent.x86_64 libffi.x86_64 libgcc.i386 libgcc.x86_64 \
-libgcj.x86_64 libgcrypt.x86_64 libgpg-error.x86_64 libgssapi.x86_64 libICE.x86_64 libidn.x86_64 \
-libibverbs.x86_64 libjpeg.x86_64 libpng.x86_64 librdmacm.x86_64 libselinux.x86_64 \
-libselinux-python.x86_64 libselinux-utils.x86_64 libsemanage.x86_64 libsepol.x86_64 libSM.x86_64 \
-libstdc++.x86_64 libsysfs.x86_64 libtermcap.x86_64 libtiff.x86_64 libusb.x86_64 libuser.x86_64 \
-libutempter.x86_64 libvirt.x86_64 libvirt-python.x86_64 libvolume_id.x86_64 libX11.x86_64 \
-libXau.x86_64 libXcursor.x86_64 libXdmcp.x86_64 libXext.x86_64 libXfixes.x86_64 libXft.x86_64 \
-libXi.x86_64 libXinerama.x86_64 libxml2.x86_64 libxml2-python.x86_64 libXrandr.x86_64 \
-libXrender.x86_64 libxslt.x86_64 libXtst.x86_64 log4j.x86_64 logrotate.x86_64 lvm2.x86_64 \
-lzo.x86_64 m2crypto.x86_64 mailcap.noarch MAKEDEV.x86_64 mcstrans.x86_64 mdadm.x86_64 \
-mingetty.x86_64 mkinitrd.x86_64 mktemp.x86_64 module-init-tools.x86_64 mx4j.x86_64 nash.x86_64 \
-nc.x86_64 ncurses.x86_64 net-tools.x86_64 newt.x86_64 nfs-utils.x86_64 nfs-utils-lib.x86_64 \
-nspr.x86_64 nss.x86_64 ntp.x86_64 numactl.x86_64 openib.noarch openldap.x86_64 openssh.x86_64 \
-openssh-clients.x86_64 openssh-server.x86_64 openssl.x86_64 pam.x86_64 pango.x86_64 parted.x86_64 \
-passwd.x86_64 pciutils.x86_64 pcre.x86_64 perl.x86_64 perl-Config-General.noarch \
-perl-Crypt-OpenSSL-Bignum.x86_64 perl-Crypt-OpenSSL-Random.x86_64 perl-Crypt-OpenSSL-RSA.x86_64 \
-perl-DBI.x86_64 pm-utils.x86_64 policycoreutils.x86_64 popt.x86_64 portmap.x86_64 \
-postgresql-libs.x86_64 procmail.x86_64 procps.x86_64 psmisc.x86_64 python.x86_64 \
-python-elementtree.x86_64 python-iniparse.noarch python-libs.x86_64 python-sqlite.x86_64 \
-python-urlgrabber.noarch python-virtinst.noarch python26.x86_64 python26-boto.noarch \
-python26-eucadmin.x86_64 python26-libs.x86_64 python26-m2crypto.x86_64 rampartc.x86_64 \
-readline.x86_64 redhat-logos.noarch regexp.x86_64 rhpl.x86_64 rootfiles.noarch rpm.x86_64 \
-rpm-libs.x86_64 rpm-python.x86_64 rsync.x86_64 rsyslog.x86_64 scsi-target-utils.x86_64 SDL.x86_64 \
-sed.x86_64 selinux-policy.noarch sendmail.x86_64 setup.noarch sgpio.x86_64 shadow-utils.x86_64 \
-slang.x86_64 sqlite.x86_64 sudo.x86_64 system-config-network-tui.noarch SysVinit.x86_64 tar.x86_64 \
-tcp_wrappers.x86_64 termcap.noarch tomcat5-servlet-2.4-api.x86_64 tzdata.x86_64 tzdata-java.x86_64 \
-udev.x86_64 unzip.x86_64 usermode.x86_64 util-linux.x86_64 vblade.x86_64 vconfig.x86_64 \
-velocity.x86_64 vim-minimal.x86_64 vtun.x86_64 werken-xpath.x86_64 wget.x86_64 which.x86_64 \
-wireless-tools.x86_64 wsdl4j.x86_64 xalan-j2.x86_64 xen.x86_64 xen-libs.x86_64 xinetd.x86_64 \
-xml-commons.x86_64 xml-commons-apis.x86_64 xml-commons-resolver.x86_64 xorg-x11-filesystem.noarch \
-xz.x86_64 xz-libs.x86_64 yum.noarch yum-fastestmirror.noarch yum-metadata-parser.x86_64 zip.x86_64 \
-zlib.x86_64"
+  RPMS="alsa-lib.x86_64 antlr.x86_64 apr.x86_64 apr-util.x86_64 atk.x86_64 \
+audiofile.x86_64 audit-libs.x86_64 audit-libs-python.x86_64 authconfig.x86_64 \
+avahi.x86_64 avalon-framework.x86_64 avalon-logkit.x86_64 axis.x86_64 \
+axis2c.x86_64 basesystem.noarch bash.x86_64 bcel.x86_64 binutils.x86_64 \
+bitstream-vera-fonts.noarch bridge-utils.x86_64 bzip2.x86_64 bzip2-libs.x86_64 \
+cairo.x86_64 centos-release.x86_64 centos-release-notes.x86_64 \
+checkpolicy.x86_64 chkconfig.x86_64 classpathx-jaf.x86_64 \
+classpathx-mail.x86_64 coreutils.x86_64 cpio.x86_64 cracklib.x86_64 \
+cracklib-dicts.x86_64 crontabs.noarch cryptsetup-luks.x86_64 cups-libs.x86_64 \
+curl.x86_64 cyrus-sasl.x86_64 cyrus-sasl-lib.x86_64 cyrus-sasl-md5.x86_64 \
+db4.x86_64 dbus.x86_64 dbus-glib.x86_64 dbus-libs.x86_64 dbus-python.x86_64 \
+device-mapper.x86_64 device-mapper-event.x86_64 device-mapper-multipath.x86_64 \
+dhclient.x86_64 dhcp.x86_64 diffutils.x86_64 dmidecode.x86_64 dmraid.x86_64 \
+dmraid-events.x86_64 dnsmasq.x86_64 drbd83.x86_64 e2fsprogs.x86_64 \
+e2fsprogs-libs.x86_64 e4fsprogs-libs.x86_64 ebtables.x86_64 ed.x86_64 \
+elfutils-libelf.x86_64 elrepo-release.noarch epel-release.noarch esound.x86_64 \
+ethtool.x86_64 euca2ools.noarch euca2ools-release.noarch eucalyptus.x86_64 \
+eucalyptus-admin-tools.x86_64 eucalyptus-cc.x86_64 eucalyptus-cloud \
+eucalyptus-common-java.x86_64 eucalyptus-gl.x86_64 eucalyptus-nc.x86_64 \
+eucalyptus-sc.x86_64 eucalyptus-walrus.x86_64 expat.x86_64 file.x86_64 \
+filesystem.x86_64 findutils.x86_64 fipscheck.x86_64 fipscheck-lib.x86_64 \
+fontconfig.x86_64 freetype.x86_64 fuse-libs.x86_64 gawk.x86_64 gdbm.x86_64 \
+geronimo-specs.x86_64 geronimo-specs-compat.x86_64 giflib.x86_64 gjdoc.x86_64 \
+glib2.x86_64 glibc.i686 glibc.x86_64 glibc-common.x86_64 gnutls.x86_64 \
+grep.x86_64 grub.x86_64 gtk2.x86_64 gzip.x86_64 hal.x86_64 hdparm.x86_64 \
+hesiod.x86_64 hicolor-icon-theme.noarch hmaccalc.x86_64 httpd.x86_64 \
+hwdata.noarch info.x86_64 initscripts.x86_64 iproute.x86_64 iptables.x86_64 \
+iptables-ipv6.x86_64 iputils.x86_64 iscsi-initiator-utils.x86_64 \
+jakarta-commons-collections.x86_64 jakarta-commons-discovery.x86_64 \
+jakarta-commons-httpclient.x86_64 jakarta-commons-logging.x86_64 \
+jakarta-oro.x86_64 java-1.4.2-gcj-compat.x86_64 java-1.6.0-openjdk.x86_64 \
+jdom.x86_64 jpackage-utils.noarch kbd.x86_64 kernel.x86_64 kernel-xen.x86_64 \
+keyutils-libs.x86_64 kmod-drbd83.x86_64 kpartx.x86_64 krb5-libs.x86_64 \
+kudzu.x86_64 less.x86_64 libacl.x86_64 libart_lgpl.x86_64 libattr.x86_64 \
+libcap.x86_64 libdaemon.x86_64 libevent.x86_64 libffi.x86_64 libgcc.i386 \
+libgcc.x86_64 libgcj.x86_64 libgcrypt.x86_64 libgpg-error.x86_64 \
+libgssapi.x86_64 libICE.x86_64 libidn.x86_64 libibverbs.x86_64 libjpeg.x86_64 \
+libpng.x86_64 librdmacm.x86_64 libselinux.x86_64 libselinux-python.x86_64 \
+libselinux-utils.x86_64 libsemanage.x86_64 libsepol.x86_64 libSM.x86_64 \
+libstdc++.x86_64 libsysfs.x86_64 libtermcap.x86_64 libtiff.x86_64 \
+libusb.x86_64 libuser.x86_64 libutempter.x86_64 libvirt.x86_64 \
+libvirt-python.x86_64 libvolume_id.x86_64 libX11.x86_64 libXau.x86_64 \
+libXcursor.x86_64 libXdmcp.x86_64 libXext.x86_64 libXfixes.x86_64 \
+libXft.x86_64 libXi.x86_64 libXinerama.x86_64 libxml2.x86_64 \
+libxml2-python.x86_64 libXrandr.x86_64 libXrender.x86_64 libxslt.x86_64 \
+libXtst.x86_64 log4j.x86_64 logrotate.x86_64 lvm2.x86_64 lzo.x86_64 \
+m2crypto.x86_64 mailcap.noarch MAKEDEV.x86_64 mcstrans.x86_64 mdadm.x86_64 \
+mingetty.x86_64 mkinitrd.x86_64 mktemp.x86_64 module-init-tools.x86_64 \
+mx4j.x86_64 nash.x86_64 nc.x86_64 ncurses.x86_64 net-tools.x86_64 newt.x86_64 \
+nfs-utils.x86_64 nfs-utils-lib.x86_64 nspr.x86_64 nss.x86_64 ntp.x86_64 \
+numactl.x86_64 openib.noarch openldap.x86_64 openssh.x86_64 \
+openssh-clients.x86_64 openssh-server.x86_64 openssl.x86_64 pam.x86_64 \
+pango.x86_64 parted.x86_64 passwd.x86_64 pciutils.x86_64 pcre.x86_64 \
+perl.x86_64 perl-Config-General.noarch perl-Crypt-OpenSSL-Bignum.x86_64 \
+perl-Crypt-OpenSSL-Random.x86_64 perl-Crypt-OpenSSL-RSA.x86_64 perl-DBI.x86_64 \
+pm-utils.x86_64 policycoreutils.x86_64 popt.x86_64 portmap.x86_64 \
+postgresql-libs.x86_64 prelink.x86_64 procmail.x86_64 procps.x86_64 \
+psmisc.x86_64 python.x86_64 python-elementtree.x86_64 python-iniparse.noarch \
+python-libs.x86_64 python-sqlite.x86_64 python-urlgrabber.noarch \
+python-virtinst.noarch python26.x86_64 python26-boto.noarch \
+python26-eucadmin.x86_64 python26-libs.x86_64 python26-m2crypto.x86_64 \
+rampartc.x86_64 readline.x86_64 redhat-logos.noarch regexp.x86_64 rhpl.x86_64 \
+rootfiles.noarch rpm.x86_64 rpm-libs.x86_64 rpm-python.x86_64 rsync.x86_64 \
+rsyslog.x86_64 scsi-target-utils.x86_64 SDL.x86_64 sed.x86_64 \
+selinux-policy.noarch selinux-policy-targeted.noarch sendmail.x86_64 \
+setools.x86_64 setup.noarch sgpio.x86_64 shadow-utils.x86_64 slang.x86_64 \
+sqlite.x86_64 sudo.x86_64 sysfsutils.x86_64 sysklogd.x86_64 \
+system-config-network-tui.noarch SysVinit.x86_64 tar.x86_64 tcl.x86_64 \
+tcp_wrappers.x86_64 termcap.noarch tomcat5-servlet-2.4-api.x86_64 \
+tzdata.x86_64 tzdata-java.x86_64 udev.x86_64 udftools.x86_64 unzip.x86_64 \
+usermode.x86_64 util-linux.x86_64 vblade.x86_64 vconfig.x86_64 velocity.x86_64 \
+vim-minimal.x86_64 vtun.x86_64 werken-xpath.x86_64 wget.x86_64 which.x86_64 \
+wireless-tools.x86_64 wsdl4j.x86_64 xalan-j2.x86_64 xen.x86_64 xen-libs.x86_64 \
+xinetd.x86_64 xml-commons.x86_64 xml-commons-apis.x86_64 \
+xml-commons-resolver.x86_64 xorg-x11-filesystem.noarch xz.x86_64 \
+xz-libs.x86_64 yum.noarch yum-fastestmirror.noarch yum-metadata-parser.x86_64 \
+zip.x86_64 zlib.x86_64"
   ;;
 "6")
-  RPMS="alsa-lib.x86_64 apache-tomcat-apis.noarch apr.x86_64 apr-util.x86_64 apr-util-ldap.x86_64 \
-atk.x86_64 audit-libs.x86_64 augeas-libs.x86_64 authconfig.x86_64 avahi-libs.x86_64 \
-avalon-framework.x86_64 avalon-logkit.noarch axis.noarch axis2c.x86_64 b43-openfwwf.noarch \
-basesystem.noarch bash.x86_64 bcel.x86_64 bfa-firmware.noarch binutils.x86_64 bridge-utils.x86_64 \
-bzip2.x86_64 bzip2-libs.x86_64 ca-certificates.noarch cairo.x86_64 celt051.x86_64 \
-centos-release.x86_64 checkpolicy.x86_64 chkconfig.x86_64 classpathx-jaf.x86_64 \
-classpathx-mail.noarch ConsoleKit.x86_64 ConsoleKit-libs.x86_64 coreutils.x86_64 \
-coreutils-libs.x86_64 cpio.x86_64 cracklib.x86_64 cracklib-dicts.x86_64 crda.x86_64 cronie.x86_64 \
-cronie-anacron.x86_64 crontabs.noarch cups-libs.x86_64 curl.x86_64 cvs.x86_64 cyrus-sasl.x86_64 \
-cyrus-sasl-lib.x86_64 cyrus-sasl-md5.x86_64 dash.x86_64 db4.x86_64 db4-utils.x86_64 dbus.x86_64 \
-dbus-glib.x86_64 dbus-libs.x86_64 dbus-python.x86_64 dejavu-fonts-common.noarch \
-dejavu-serif-fonts.noarch device-mapper.x86_64 device-mapper-event.x86_64 \
-device-mapper-event-libs.x86_64 device-mapper-libs.x86_64 diffutils.x86_64 dhclient.x86_64 \
-dhcp-common.x86_64 dhcp41.x86_64 dhcp41-common.x86_64 dnsmasq.x86_64 dracut.noarch \
-dracut-kernel.noarch drbd83-utils.x86_64 e2fsprogs.x86_64 e2fsprogs-libs.x86_64 ebtables.x86_64 \
-eggdbus.x86_64 elfutils-libelf.x86_64 efibootmgr.x86_64 elrepo-release.noarch epel-release.noarch \
-ethtool.x86_64 euca2ools.noarch eucalyptus.x86_64 eucalyptus-admin-tools.noarch \
-eucalyptus-cc.x86_64 eucalyptus-cloud eucalyptus-common-java.x86_64 eucalyptus-gl.x86_64 \
-eucalyptus-nc.x86_64 eucalyptus-sc.x86_64 eucalyptus-walrus.x86_64 expat.x86_64 file.x86_64 \
-file-libs.x86_64 filesystem.x86_64 findutils.x86_64 fipscheck.x86_64 fipscheck-lib.x86_64 \
-flac.x86_64 fontconfig.x86_64 fontpackages-filesystem.noarch freetype.x86_64 fuse-libs.x86_64 \
-gamin.x86_64 gawk.x86_64 gdbm.x86_64 geronimo-specs.noarch geronimo-specs-compat.noarch \
-gettext.x86_64 giflib.x86_64 glib2.x86_64 glibc.i686 glibc.x86_64 glibc-common.x86_64 gmp.x86_64 \
-gnupg2.x86_64 gnutls.x86_64 gnutls-utils.x86_64 gpgme.x86_64 gpxe-roms-qemu.noarch grep.x86_64 \
-groff.x86_64 grub.x86_64 grubby.x86_64 gtk2.x86_64 gzip.x86_64 hicolor-icon-theme.noarch \
-httpd.x86_64 httpd-tools.x86_64 hwdata.noarch info.x86_64 initscripts.x86_64 iproute.x86_64 \
-iptables.x86_64 iptables-ipv6.x86_64 iputils.x86_64 ipw2100-firmware.noarch ipw2200-firmware.noarch \
-iscsi-initiator-utils.x86_64 iw.x86_64 iwl1000-firmware.noarch iwl100-firmware.noarch \
-iwl3945-firmware.noarch iwl4965-firmware.noarch iwl5000-firmware.noarch iwl5150-firmware.noarch \
-iwl6000-firmware.noarch iwl6000g2a-firmware.noarch iwl6000g2b-firmware.noarch \
-iwl6050-firmware.noarch jakarta-commons-collections.noarch jakarta-commons-discovery.noarch \
-jakarta-commons-httpclient.x86_64 jakarta-commons-logging.noarch jakarta-oro.x86_64 \
-jasper-libs.x86_64 java-1.5.0-gcj.x86_64 java-1.6.0-openjdk.x86_64 java_cup.x86_64 jdom.noarch \
-jline.noarch jpackage-utils.noarch kbd.x86_64 kbd-misc.noarch kernel.x86_64 kernel-firmware.noarch \
-keyutils-libs.x86_64 kmod-drbd83.x86_64 krb5-libs.x86_64 less.x86_64 libacl.x86_64 libaio.x86_64 \
-libart_lgpl.x86_64 libasyncns.x86_64 libattr.x86_64 libblkid.x86_64 libcap.x86_64 libcap-ng.x86_64 \
-libcgroup.x86_64 libcom_err.x86_64 libcurl.x86_64 libdrm.x86_64 libedit.x86_64 libevent.x86_64 \
-libffi.x86_64 libgcc.i686 libgcc.x86_64 libgcj.x86_64 libgcrypt.x86_64 libgomp.x86_64 \
-libgpg-error.x86_64 libgssglue.x86_64 libibverbs.x86_64 libICE.x86_64 libidn.x86_64 libjpeg.x86_64 \
-libnih.x86_64 libnl.x86_64 libogg.x86_64 libpcap.x86_64 libpciaccess.x86_64 libpng.x86_64 \
-librdmacm.x86_64 libselinux.x86_64 libselinux-python.x86_64 libselinux-utils.x86_64 \
-libsemanage.x86_64 libsepol.x86_64 libSM.x86_64 libsndfile.x86_64 libss.x86_64 libssh2.x86_64 \
-libstdc++.x86_64 libtasn1.x86_64 libthai.x86_64 libtiff.x86_64 libtirpc.x86_64 libudev.x86_64 \
-libusb.x86_64 libuser.x86_64 libutempter.x86_64 libuuid.x86_64 libvirt.x86_64 libvirt-client.x86_64 \
-libvorbis.x86_64 libX11.x86_64 libX11-common.noarch libXau.x86_64 libxcb.x86_64 \
-libXcomposite.x86_64 libXcursor.x86_64 libXdamage.x86_64 libXext.x86_64 libXfixes.x86_64 \
-libXft.x86_64 libXi.x86_64 libXinerama.x86_64 libxml2.x86_64 libXrandr.x86_64 libXrender.x86_64 \
-libxslt.x86_64 libXtst.x86_64 log4j.x86_64 logrotate.x86_64 lua.x86_64 lvm2.x86_64 lvm2-libs.x86_64 \
-lzo.x86_64 lzop.x86_64 m2crypto.x86_64 m4.x86_64 mailcap.noarch MAKEDEV.x86_64 mdadm.x86_64 \
-mingetty.x86_64 module-init-tools.x86_64 mx4j.noarch mysql-libs.x86_64 nc.x86_64 ncurses.x86_64 \
-ncurses-base.x86_64 ncurses-libs.x86_64 net-tools.x86_64 netcf-libs.x86_64 newt.x86_64 \
-newt-python.x86_64 nfs-utils.x86_64 nfs-utils-lib.x86_64 nspr.x86_64 nss.x86_64 nss-softokn.x86_64 \
-nss-softokn-freebl.i686 nss-softokn-freebl.x86_64 nss-sysinit.x86_64 nss-util.x86_64 ntp.x86_64 \
-ntpdate.x86_64 numactl.x86_64 openldap.x86_64 openssh.x86_64 openssh-clients.x86_64 \
-openssh-server.x86_64 openssl.x86_64 pam.x86_64 pango.x86_64 parted.x86_64 passwd.x86_64 \
-pciutils.x86_64 pciutils-libs.x86_64 pcre.x86_64 perl.x86_64 perl-Config-General.noarch \
-perl-Crypt-OpenSSL-Bignum.x86_64 perl-Crypt-OpenSSL-Random.x86_64 perl-Crypt-OpenSSL-RSA.x86_64 \
-perl-libs.x86_64 perl-Module-Pluggable.x86_64 perl-Pod-Escapes.x86_64 perl-Pod-Simple.x86_64 \
-perl-version.x86_64 pinentry.x86_64 pixman.x86_64 pkgconfig.x86_64 plymouth.x86_64 \
-plymouth-core-libs.x86_64 plymouth-scripts.x86_64 policycoreutils.x86_64 polkit.x86_64 popt.x86_64 \
-postfix.x86_64 procps.x86_64 psmisc.x86_64 pth.x86_64 pulseaudio-libs.x86_64 pygpgme.x86_64 \
-python.x86_64 python-boto.noarch python-ethtool.x86_64 python-eucadmin.noarch \
-python-iniparse.noarch python-iwlib.x86_64 python-libs.x86_64 python-pycurl.x86_64 \
-python-urlgrabber.noarch qemu-img.x86_64 qemu-kvm.x86_64 ql2100-firmware.noarch \
-ql2200-firmware.noarch ql23xx-firmware.noarch ql2400-firmware.noarch ql2500-firmware.noarch \
-radvd.x86_64 rampartc.x86_64 readline.x86_64 redhat-logos.noarch regexp.x86_64 rhino.noarch \
-rootfiles.noarch rpcbind.x86_64 rpm.x86_64 rpm-libs.x86_64 rpm-python.x86_64 rsync.x86_64 \
-rsyslog.x86_64 rt61pci-firmware.noarch rt73usb-firmware.noarch scsi-target-utils.x86_64 \
-seabios.x86_64 sed.x86_64 selinux-policy.noarch setup.noarch sgabios-bin.noarch shadow-utils.x86_64 \
-sinjdoc.x86_64 slang.x86_64 spice-server.x86_64 sqlite.x86_64 sudo.x86_64 \
-system-config-network-tui.noarch sysvinit-tools.x86_64 tar.x86_64 tcp_wrappers-libs.x86_64 \
-tomcat6-servlet-2.5-api.noarch tzdata.noarch tzdata-java.noarch udev.x86_64 unzip.x86_64 \
-upstart.x86_64 usermode.x86_64 ustr.x86_64 util-linux-ng.x86_64 vblade.x86_64 vconfig.x86_64 \
-velocity.noarch vgabios.noarch vim-minimal.x86_64 vtun.x86_64 werken-xpath.noarch wget.x86_64 \
-which.x86_64 wireless-tools.x86_64 wsdl4j.noarch xalan-j2.noarch xinetd.x86_64 \
-xml-commons-apis.x86_64 xml-commons-resolver.x86_64 xz.x86_64 xz-libs.x86_64 yajl.x86_64 yum.noarch \
-yum-metadata-parser.x86_64 yum-plugin-fastestmirror.noarch zd1211-firmware.noarch zip.x86_64 \
-zlib.x86_64"
+  RPMS="acl.x86_64 alsa-lib.x86_64 apache-tomcat-apis.noarch apr.x86_64 \
+apr-util.x86_64 apr-util-ldap.x86_64 atk.x86_64 attr.x86_64 audit.x86_64 \
+audit-libs.x86_64 augeas-libs.x86_64 authconfig.x86_64 avahi-libs.x86_64 \
+avalon-framework.x86_64 avalon-logkit.noarch axis.noarch axis2c.x86_64 \
+b43-openfwwf.noarch basesystem.noarch bash.x86_64 bcel.x86_64 \
+bfa-firmware.noarch binutils.x86_64 bridge-utils.x86_64 bwidget.noarch \
+bzip2.x86_64 bzip2-libs.x86_64 ca-certificates.noarch cairo.x86_64 \
+celt051.x86_64 centos-release.x86_64 checkpolicy.x86_64 chkconfig.x86_64 \
+classpathx-jaf.x86_64 classpathx-mail.noarch ConsoleKit.x86_64 \
+ConsoleKit-libs.x86_64 coreutils.x86_64 coreutils-libs.x86_64 cpio.x86_64 \
+cracklib.x86_64 cracklib-dicts.x86_64 crda.x86_64 cronie.x86_64 \
+cronie-anacron.x86_64 crontabs.noarch cups-libs.x86_64 curl.x86_64 cvs.x86_64 \
+cyrus-sasl.x86_64 cyrus-sasl-lib.x86_64 cyrus-sasl-md5.x86_64 dash.x86_64 \
+db4.x86_64 db4-utils.x86_64 dbus.x86_64 dbus-glib.x86_64 dbus-libs.x86_64 \
+dbus-python.x86_64 dejavu-fonts-common.noarch dejavu-serif-fonts.noarch \
+device-mapper.x86_64 device-mapper-event.x86_64 \
+device-mapper-event-libs.x86_64 device-mapper-libs.x86_64 diffutils.x86_64 \
+dhclient.x86_64 dhcp-common.x86_64 dhcp41.x86_64 dhcp41-common.x86_64 \
+dnsmasq.x86_64 dracut.noarch dracut-kernel.noarch drbd83-utils.x86_64 \
+e2fsprogs.x86_64 e2fsprogs-libs.x86_64 ebtables.x86_64 eggdbus.x86_64 \
+elfutils-libelf.x86_64 efibootmgr.x86_64 elrepo-release.noarch \
+epel-release.noarch ethtool.x86_64 euca2ools.noarch euca2ools-release.noarch \
+eucalyptus.x86_64 eucalyptus-admin-tools.noarch eucalyptus-cc.x86_64 \
+eucalyptus-cloud eucalyptus-common-java.x86_64 eucalyptus-gl.x86_64 \
+eucalyptus-nc.x86_64 eucalyptus-sc.x86_64 eucalyptus-walrus.x86_64 \
+expat.x86_64 file.x86_64 file-libs.x86_64 filesystem.x86_64 findutils.x86_64 \
+fipscheck.x86_64 fipscheck-lib.x86_64 flac.x86_64 fontconfig.x86_64 \
+fontpackages-filesystem.noarch freetype.x86_64 fuse-libs.x86_64 gamin.x86_64 \
+gawk.x86_64 gdbm.x86_64 geronimo-specs.noarch geronimo-specs-compat.noarch \
+gettext.x86_64 giflib.x86_64 glib2.x86_64 glibc.i686 glibc.x86_64 \
+glibc-common.x86_64 gmp.x86_64 gnupg2.x86_64 gnutls.x86_64 gnutls-utils.x86_64 \
+gpgme.x86_64 gpxe-roms-qemu.noarch grep.x86_64 groff.x86_64 grub.x86_64 \
+grubby.x86_64 gtk2.x86_64 gzip.x86_64 hdparm.x86_64 hicolor-icon-theme.noarch \
+httpd.x86_64 httpd-tools.x86_64 hwdata.noarch info.x86_64 initscripts.x86_64 \
+iproute.x86_64 iptables.x86_64 iptables-ipv6.x86_64 iputils.x86_64 \
+ipw2100-firmware.noarch ipw2200-firmware.noarch iscsi-initiator-utils.x86_64 \
+iw.x86_64 iwl1000-firmware.noarch iwl100-firmware.noarch \
+iwl3945-firmware.noarch iwl4965-firmware.noarch iwl5000-firmware.noarch \
+iwl5150-firmware.noarch iwl6000-firmware.noarch iwl6000g2a-firmware.noarch \
+iwl6000g2b-firmware.noarch iwl6050-firmware.noarch \
+jakarta-commons-collections.noarch jakarta-commons-discovery.noarch \
+jakarta-commons-httpclient.x86_64 jakarta-commons-logging.noarch \
+jakarta-oro.x86_64 jasper-libs.x86_64 java-1.5.0-gcj.x86_64 \
+java-1.6.0-openjdk.x86_64 java_cup.x86_64 jdom.noarch jline.noarch \
+jpackage-utils.noarch kbd.x86_64 kbd-misc.noarch kernel.x86_64 \
+kernel-firmware.noarch keyutils-libs.x86_64 kmod-drbd83.x86_64 \
+krb5-libs.x86_64 less.x86_64 libacl.x86_64 libaio.x86_64 libart_lgpl.x86_64 \
+libasyncns.x86_64 libattr.x86_64 libblkid.x86_64 libcap.x86_64 \
+libcap-ng.x86_64 libcgroup.x86_64 libcom_err.x86_64 libcurl.x86_64 \
+libdrm.x86_64 libedit.x86_64 libevent.x86_64 libffi.x86_64 libgcc.i686 \
+libgcc.x86_64 libgcj.x86_64 libgcrypt.x86_64 libglade2.x86_64 libgomp.x86_64 \
+libgpg-error.x86_64 libgssglue.x86_64 libibverbs.x86_64 libICE.x86_64 \
+libidn.x86_64 libjpeg.x86_64 libnih.x86_64 libnl.x86_64 libogg.x86_64 \
+libpcap.x86_64 libpciaccess.x86_64 libpng.x86_64 librdmacm.x86_64 \
+libselinux.x86_64 libselinux-python.x86_64 libselinux-utils.x86_64 \
+libsemanage.x86_64 libsepol.x86_64 libSM.x86_64 libsndfile.x86_64 libss.x86_64 \
+libssh2.x86_64 libstdc++.x86_64 libsysfs.x86_64 libtasn1.x86_64 libthai.x86_64 \
+libtiff.x86_64 libtirpc.x86_64 libudev.x86_64 libusb.x86_64 libuser.x86_64 \
+libutempter.x86_64 libuuid.x86_64 libvirt.x86_64 libvirt-client.x86_64 \
+libvorbis.x86_64 libX11.x86_64 libX11-common.noarch libXau.x86_64 \
+libxcb.x86_64 libXcomposite.x86_64 libXcursor.x86_64 libXdamage.x86_64 \
+libXext.x86_64 libXfixes.x86_64 libXft.x86_64 libXi.x86_64 libXinerama.x86_64 \
+libxml2.x86_64 libXrandr.x86_64 libXrender.x86_64 libxslt.x86_64 \
+libXtst.x86_64 log4j.x86_64 logrotate.x86_64 lua.x86_64 lvm2.x86_64 \
+lvm2-libs.x86_64 lzo.x86_64 lzop.x86_64 m2crypto.x86_64 m4.x86_64 \
+mailcap.noarch MAKEDEV.x86_64 mdadm.x86_64 mingetty.x86_64 \
+module-init-tools.x86_64 mx4j.noarch mysql-libs.x86_64 nc.x86_64 \
+ncurses.x86_64 ncurses-base.x86_64 ncurses-libs.x86_64 net-tools.x86_64 \
+netcf-libs.x86_64 newt.x86_64 newt-python.x86_64 nfs-utils.x86_64 \
+nfs-utils-lib.x86_64 nspr.x86_64 nss.x86_64 nss-softokn.x86_64 \
+nss-softokn-freebl.i686 nss-softokn-freebl.x86_64 nss-sysinit.x86_64 \
+nss-util.x86_64 ntp.x86_64 ntpdate.x86_64 numactl.x86_64 openldap.x86_64 \
+openssh.x86_64 openssh-clients.x86_64 openssh-server.x86_64 openssl.x86_64 \
+pam.x86_64 pango.x86_64 parted.x86_64 passwd.x86_64 pciutils.x86_64 \
+pciutils-libs.x86_64 pcre.x86_64 perl.x86_64 perl-Config-General.noarch \
+perl-Crypt-OpenSSL-Bignum.x86_64 perl-Crypt-OpenSSL-Random.x86_64 \
+perl-Crypt-OpenSSL-RSA.x86_64 perl-libs.x86_64 perl-Module-Pluggable.x86_64 \
+perl-Pod-Escapes.x86_64 perl-Pod-Simple.x86_64 perl-version.x86_64 \
+pinentry.x86_64 pixman.x86_64 pkgconfig.x86_64 plymouth.x86_64 \
+plymouth-core-libs.x86_64 plymouth-scripts.x86_64 policycoreutils.x86_64 \
+polkit.x86_64 popt.x86_64 postfix.x86_64 prelink.x86_64 procps.x86_64 \
+psmisc.x86_64 pth.x86_64 pulseaudio-libs.x86_64 pygpgme.x86_64 python.x86_64 \
+python-boto.noarch python-ethtool.x86_64 python-eucadmin.noarch \
+python-iniparse.noarch python-iwlib.x86_64 python-libs.x86_64 \
+python-pycurl.x86_64 python-urlgrabber.noarch qemu-img.x86_64 qemu-kvm.x86_64 \
+ql2100-firmware.noarch ql2200-firmware.noarch ql23xx-firmware.noarch \
+ql2400-firmware.noarch ql2500-firmware.noarch radvd.x86_64 rampartc.x86_64 \
+readline.x86_64 redhat-logos.noarch regexp.x86_64 rhino.noarch \
+rootfiles.noarch rpcbind.x86_64 rpm.x86_64 rpm-libs.x86_64 rpm-python.x86_64 \
+rsync.x86_64 rsyslog.x86_64 rt61pci-firmware.noarch rt73usb-firmware.noarch \
+scsi-target-utils.x86_64 seabios.x86_64 sed.x86_64 selinux-policy.noarch \
+selinux-policy-targeted.noarch setools.x86_64 setools-console.x86_64 \
+setools-gui.x86_64 setools-libs.x86_64 setools-libs-tcl.x86_64 setup.noarch \
+sgabios-bin.noarch shadow-utils.x86_64 sinjdoc.x86_64 slang.x86_64 \
+spice-server.x86_64 sqlite.x86_64 sudo.x86_64 sysfsutils.x86_64 \
+system-config-network-tui.noarch sysvinit-tools.x86_64 tar.x86_64 tcl.x86_64 \
+tcp_wrappers-libs.x86_64 tk.x86_64 tomcat6-servlet-2.5-api.noarch \
+tzdata.noarch tzdata-java.noarch udev.x86_64 udftools.x86_64 unzip.x86_64 \
+upstart.x86_64 usermode.x86_64 ustr.x86_64 util-linux-ng.x86_64 vblade.x86_64 \
+vconfig.x86_64 velocity.noarch vgabios.noarch vim-minimal.x86_64 vtun.x86_64 \
+werken-xpath.noarch wget.x86_64 which.x86_64 wireless-tools.x86_64 \
+wsdl4j.noarch xalan-j2.noarch xinetd.x86_64 xml-common.noarch \
+xml-commons-apis.x86_64 xml-commons-resolver.x86_64 xz.x86_64 xz-libs.x86_64 \
+yajl.x86_64 yum.noarch yum-metadata-parser.x86_64 \
+yum-plugin-fastestmirror.noarch zd1211-firmware.noarch zip.x86_64 zlib.x86_64"
   ;;
 esac
 
@@ -1890,7 +2229,12 @@ case "$ELVERSION" in
   if [ $ELVERSION -eq 6 ] ; then
     install_package syslinux-perl
   fi
-  convert -size 640x480 gradient:#022b40-#abbfca gradient_background.png
+  # The below should work for creating a gradient, but becuase it doesn't, we hack around it.
+  # convert -size 640x480 gradient:'#022b40-#abbfca' gradient_background.png
+  convert -size 1x1 xc:#022b40 top.png
+  convert -size 1x1 xc:#abbfca bottom.png
+  convert top.png bottom.png -append merged.png
+  convert merged.png -resize 640x480\! gradient_background.png
   convert themes/eucalyptus/logo.png -resize 250% large-logo.png
   composite -gravity south -geometry +0+50 large-logo.png gradient_background.png splash.jpg
 ;;
@@ -1925,7 +2269,14 @@ case "$ELVERSION" in
 esac
 
 # Create the .iso image
-install_package anaconda-runtime
+case "$ELVERSION" in
+"5")
+  install_package anaconda-runtime
+  ;;
+"6")
+  install_package anaconda
+  ;;
+esac
 cd ${BUILDDIR}
 mkisofs -o silvereye.${DATESTAMP}.iso -b isolinux.bin -c boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -R -J -v -T -joliet-long isolinux/
 case "$ELVERSION" in
