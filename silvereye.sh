@@ -1131,6 +1131,7 @@ while ! echo "$CONFIGUREFRONTEND" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null 
   n|N|no|NO|No)
     echo "$(date)- Skipped Frontend configuration." | tee -a $LOGFILE
     echo ""
+    exit 0
     ;;
   *)
     echo "Please answer either 'yes' or 'no'."
