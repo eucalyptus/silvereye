@@ -873,7 +873,7 @@ function create_emi {
     echo "greater than the root filesystem + 512 MB swap is allocated as an 'ephemeral'"
     echo "storage partition."
     echo ""
-    read -p "Would you like to create a small, medium, or large root filesystem for your EMI? " IMAGESIZE
+    read -p "Would you like a small (1.5G), medium (4.5G), or large (9.5G) root filesystem for your EMI? " IMAGESIZE
     case "$IMAGESIZE" in
     "small")
       SEEKBLOCKS=1533
@@ -1131,6 +1131,7 @@ while ! echo "$CONFIGUREFRONTEND" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null 
   n|N|no|NO|No)
     echo "$(date)- Skipped Frontend configuration." | tee -a $LOGFILE
     echo ""
+    exit 0
     ;;
   *)
     echo "Please answer either 'yes' or 'no'."
