@@ -36,9 +36,9 @@
 
 # Set the EUCALYPTUSVERSION variable to the version of Eucalyptus you would like
 # to create an installation disk for.
-# Valid values are "3.0" and "3-devel".
+# Valid values are "3.0", "3-devel", and "nightly".
 # Subscriptions are required for "3.0"
-EUCALYPTUSVERSION="3-devel"
+EUCALYPTUSVERSION="nightly"
 
 # For subscriptions, enter your yum credentials in these variables
 ENTERPRISECERT="-----BEGIN CERTIFICATE-----
@@ -288,6 +288,9 @@ sed -i -e 's/^VNET_MODE=\"SYSTEM\"/VNET_MODE=\"MANAGED-NOVLAN"/' /etc/eucalyptus
 REPLACEMEENTERPRISECERT
 REPLACEMEENTERPRISEPRIVATEKEY
 REPLACEMEEUCAGPGKEY
+
+# Hack to make the nightly yum repo work after installation.
+REPLACEMENIGHTLY
 
 # Create eucalyptus-frontend-config.sh script
 cat >> /usr/local/sbin/eucalyptus-frontend-config.sh <<"EOFFRONTENDCONFIG"
@@ -873,7 +876,7 @@ function create_emi {
     echo "greater than the root filesystem + 512 MB swap is allocated as an 'ephemeral'"
     echo "storage partition."
     echo ""
-    read -p "Would you like a small (1.5G), medium (4.5G), or large (9.5G) root filesystem for your EMI? " IMAGESIZE
+    read -p "Would you like a small (1.5GB), medium (4.5GB), or large (9.5GB) root filesystem for your EMI? " IMAGESIZE
     case "$IMAGESIZE" in
     "small")
       SEEKBLOCKS=1533
@@ -1131,6 +1134,9 @@ while ! echo "$CONFIGUREFRONTEND" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null 
   n|N|no|NO|No)
     echo "$(date)- Skipped Frontend configuration." | tee -a $LOGFILE
     echo ""
+    echo "You can re-run this configuration scipt later by executing"
+    echo "/usr/local/sbin/eucalyptus-frontend-config.sh as root."
+    echo ""
     exit 0
     ;;
   *)
@@ -1305,6 +1311,9 @@ sed -i -e 's/^VNET_MODE=\"SYSTEM\"/VNET_MODE=\"MANAGED-NOVLAN"/' /etc/eucalyptus
 REPLACEMEENTERPRISECERT
 REPLACEMEENTERPRISEPRIVATEKEY
 REPLACEMEEUCAGPGKEY
+
+# Hack to make the nightly yum repo work after installation.
+REPLACEMENIGHTLY
 
 # Create eucalyptus-nc-config.sh script
 cat >> /usr/local/sbin/eucalyptus-nc-config.sh <<"EOF"
@@ -1779,12 +1788,22 @@ case "$EUCALYPTUSVERSION" in
   sed -i -e "s#REPLACEMEENTERPRISEPRIVATEKEY#echo \"`echo -e "${ENTERPRISEPRIVATEKEY}" | sed ':a;N;$!ba;s/\n/NEWLINETAG/g'`\" > /etc/pki/tls/private/eucalyptus-enterprise.key#" ${BUILDDIR}/isolinux/ks/*.cfg
   sed -i -e "s#REPLACEMEEUCAGPGKEY#echo \"`echo -e "${EUCAGPGKEY}" | sed ':a;N;$!ba;s/\n/NEWLINETAG/g'`\" > /etc/pki/rpm-gpg/eucalyptus-release-key.pub#" ${BUILDDIR}/isolinux/ks/*.cfg
   sed -i -e 's/NEWLINETAG/\n/g' ${BUILDDIR}/isolinux/ks/*.cfg
+  sed -i -e '/REPLACEMENIGHTLY/d' ${BUILDDIR}/isolinux/ks/*.cfg
   ;;
 "3-devel")
   sed -i -e 's/EUCALYPTUSRELEASEPACKAGEREPLACEME/eucalyptus-nightly-release\npgdg-centos91/' ${BUILDDIR}/isolinux/ks/*.cfg
   sed -i -e '/REPLACEMEENTERPRISECERT/d' ${BUILDDIR}/isolinux/ks/*.cfg
   sed -i -e '/REPLACEMEENTERPRISEPRIVATEKEY/d' ${BUILDDIR}/isolinux/ks/*.cfg
   sed -i -e '/REPLACEMEEUCAGPGKEY/d' ${BUILDDIR}/isolinux/ks/*.cfg
+  sed -i -e '/REPLACEMENIGHTLY/d' ${BUILDDIR}/isolinux/ks/*.cfg
+  ;;
+"nightly")
+  sed -i -e 's/EUCALYPTUSRELEASEPACKAGEREPLACEME/eucalyptus-release/' ${BUILDDIR}/isolinux/ks/*.cfg
+  sed -i -e '/REPLACEMEENTERPRISECERT/d' ${BUILDDIR}/isolinux/ks/*.cfg
+  sed -i -e '/REPLACEMEENTERPRISEPRIVATEKEY/d' ${BUILDDIR}/isolinux/ks/*.cfg
+  sed -i -e '/REPLACEMEEUCAGPGKEY/d' ${BUILDDIR}/isolinux/ks/*.cfg
+  # Hack to make the nightly yum repo work after installation.
+  sed -i -e "s#REPLACEMENIGHTLY#sed -i -e 's%eucalyptus/3.1%eucalyptus/nightly/3.1%g' /etc/yum.repos.d/eucalyptus.repo#" ${BUILDDIR}/isolinux/ks/*.cfg
   ;;
 esac
 
@@ -1886,6 +1905,18 @@ case "$EUCALYPTUSVERSION" in
     sed -i -e "s%baseurl=http://yum.postgresql.org/9.1/redhat/rhel-.*%baseurl=${PGRPM91MIRROR}redhat/rhel-${ELVERSION}-x86_64%g" /etc/yum.repos.d/pgdg-91-centos.repo
   fi
   ;;
+"nightly")
+  rpm -q pgdg-centos91 > /dev/null
+  if [ $? -eq 0 ] ; then
+    echo "$(date) - Removing PostgreSQL repository package" | tee -a $SILVEREYELOGFILE
+    yum -y remove pgdg-centos91*
+  else
+    echo "$(date) - PostgreSQL repository package not present" | tee -a $SILVEREYELOGFILE
+  fi
+  if [ -f /etc/yum.repos.d/pgdg-91-centos.repo ] ; then
+    rm -f /etc/yum.repos.d/pgdg-91-centos.repo
+  fi
+  ;;
 *)
   echo "$(date) - Unsupported EUCALYPTUSVERSION $EUCALYPTUSVERSION" | tee -a $SILVEREYELOGFILE
   ;;
@@ -1929,6 +1960,16 @@ EOF
   if [ -f /etc/yum.repos.d/eucalyptus-nightly-release.repo ] ; then
     rm -f /etc/yum.repos.d/eucalyptus-nightly-release.repo
   fi
+  rpm -q eucalyptus-release > /dev/null
+  if [ $? -eq 0 ] ; then
+    echo "$(date) - Removing Eucalyptus repository package" | tee -a $SILVEREYELOGFILE
+    yum -y remove eucalyptus-release*
+  else
+    echo "$(date) - Eucalyptus repository package not present" | tee -a $SILVEREYELOGFILE
+  fi
+  if [ -f /etc/yum.repos.d/eucalyptus.repo ] ; then
+    rm -f /etc/yum.repos.d/eucalyptus.repo
+  fi
   ;;
 "3-devel")
   rpm -q eucalyptus-nightly-release > /dev/null
@@ -1949,6 +1990,49 @@ EOF
   fi
   if [ -f /etc/yum.repos.d/eucalyptus-enterprise.repo ] ; then
     rm -f /etc/yum.repos.d/eucalyptus-enterprise.repo
+  fi
+  rpm -q eucalyptus-release > /dev/null
+  if [ $? -eq 0 ] ; then
+    echo "$(date) - Removing Eucalyptus repository package" | tee -a $SILVEREYELOGFILE
+    yum -y remove eucalyptus-release-enterprise*
+  else
+    echo "$(date) - Eucalyptus repository package not present" | tee -a $SILVEREYELOGFILE
+  fi
+  if [ -f /etc/yum.repos.d/eucalyptus.repo ] ; then
+    rm -f /etc/yum.repos.d/eucalyptus.repo
+  fi
+  ;;
+"nightly")
+  rpm -q eucalyptus-release > /dev/null
+  if [ $? -eq 1 ] ; then
+    echo "$(date) - Installing Eucalyptus nightly repository package" | tee -a $SILVEREYELOGFILE
+    # Temporary hack.  Should be able to use $ELVERSION, but that package doesn't install for EL5.
+    wget http://downloads.eucalyptus.com/software/eucalyptus/nightly/3.1/centos/6/x86_64/eucalyptus-release-3.1-0.1.el6.noarch.rpm
+    rpm -Uvh eucalyptus-release-*.rpm
+    rm -f eucalyptus-release-*.rpm
+    sed -i -e 's#eucalyptus/3.1#eucalyptus/nightly/3.1#g' /etc/yum.repos.d/eucalyptus.repo
+  else
+    echo "$(date) - Eucalyptus nightly repository package already installed" | tee -a $SILVEREYELOGFILE
+  fi
+  rpm -q eucalyptus-release-enterprise > /dev/null
+  if [ $? -eq 0 ] ; then
+    echo "$(date) - Removing Eucalyptus Enterprise repository package" | tee -a $SILVEREYELOGFILE
+    yum -y remove eucalyptus-release-enterprise*
+  else
+    echo "$(date) - Eucalyptus Enterprise repository package not present" | tee -a $SILVEREYELOGFILE
+  fi
+  if [ -f /etc/yum.repos.d/eucalyptus-enterprise.repo ] ; then
+    rm -f /etc/yum.repos.d/eucalyptus-enterprise.repo
+  fi
+  rpm -q eucalyptus-nightly-release > /dev/null
+  if [ $? -eq 0 ] ; then
+    echo "$(date) - Removing Eucalyptus nightly repository package" | tee -a $SILVEREYELOGFILE
+    yum -y remove eucalyptus-nightly-release*
+  else
+    echo "$(date) - Eucalyptus nightly repository package not present" | tee -a $SILVEREYELOGFILE
+  fi
+  if [ -f /etc/yum.repos.d/eucalyptus-nightly-release.repo ] ; then
+    rm -f /etc/yum.repos.d/eucalyptus-nightly-release.repo
   fi
   ;;
 *)
@@ -1984,7 +2068,7 @@ curl.x86_64 cyrus-sasl.x86_64 cyrus-sasl-lib.x86_64 cyrus-sasl-md5.x86_64 \
 db4.x86_64 dbus.x86_64 dbus-glib.x86_64 dbus-libs.x86_64 dbus-python.x86_64 \
 device-mapper.x86_64 device-mapper-event.x86_64 device-mapper-multipath.x86_64 \
 dhclient.x86_64 dhcp.x86_64 diffutils.x86_64 dmidecode.x86_64 dmraid.x86_64 \
-dmraid-events.x86_64 dnsmasq.x86_64 drbd83.x86_64 e2fsprogs.x86_64 \
+dmraid-events.x86_64 dnsmasq.x86_64 e2fsprogs.x86_64 \
 e2fsprogs-libs.x86_64 e4fsprogs-libs.x86_64 ebtables.x86_64 ed.x86_64 \
 elfutils-libelf.x86_64 elrepo-release.noarch epel-release.noarch esound.x86_64 \
 ethtool.x86_64 euca2ools.noarch euca2ools-release.noarch eucalyptus.x86_64 \
@@ -2167,22 +2251,27 @@ yumdownloader ${RPMS}
 case "$EUCALYPTUSVERSION" in
 "3.0")
   yumdownloader eucalyptus-broker.x86_64 eucalyptus-release-enterprise.noarch mysql.x86_64
+  if [ $ELVERSION -eq 5 ] ; then
+    yumdownloader drbd83.x86_64 
+  fi
   ;;
 "3-devel")
   yumdownloader compat-libevent14.x86_64 eucalyptus-nightly-release.noarch pgdg-centos91.noarch postgresql-libs.x86_64 postgresql91.x86_64 postgresql91-libs.x86_64 postgresql91-server.x86_64 PyGreSQL.x86_64
   if [ $ELVERSION -eq 5 ] ; then
-    yumdownloader compat-rebuild-security-providers.noarch python26-PyGreSQL.x86_64
+    yumdownloader compat-rebuild-security-providers.noarch drbd83.x86_64 python26-PyGreSQL.x86_64
   fi
   ;;
-esac
-
-# Download the Eucalyptus release repository rpm
-case "$EUCALYPTUSVERSION" in
-"3.0")
-  yumdownloader eucalyptus-release-enterprise.noarch
-  ;;
-"3-devel")
-  yumdownloader eucalyptus-nightly-release.noarch pgdg-centos91.noarch
+"nightly")
+#  yumdownloader compat-libevent14.x86_64 eucalyptus-release.noarch postgresql-libs.x86_64 postgresql91.x86_64 postgresql91-libs.x86_64 postgresql91-server.x86_64 PyGreSQL.x86_64
+  yumdownloader bc.x86_64 postgresql-libs.x86_64 postgresql91.x86_64 postgresql91-libs.x86_64 postgresql91-server.x86_64
+  # Temporary hack.  Should be able to use $ELVERSION, downloaded above with yum, but that package doesn't install for EL5.
+  wget http://downloads.eucalyptus.com/software/eucalyptus/nightly/3.1/centos/6/x86_64/eucalyptus-release-3.1-0.1.el6.noarch.rpm
+  if [ $ELVERSION -eq 5 ] ; then
+    yumdownloader drbd83-utils.x86_64 mx.x86_64 postgresql91-python26.x86_64
+  fi
+  if [ $ELVERSION -eq 6 ] ; then
+    yumdownloader PyGreSQL.x86_64
+  fi
   ;;
 esac
 
