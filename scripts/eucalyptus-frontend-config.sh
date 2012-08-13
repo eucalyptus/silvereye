@@ -544,17 +544,34 @@ function get_credentials {
 
 # Function to create instance store-backed EMI
 function create_emi {
-  CDNOTMOUNTED=`ls /media/cdrom/repodata/repomd.xml > /dev/null 2>&1 ; echo $?`
-  while [ $CDNOTMOUNTED -ne 0 ] ; do
-    read -p "Please insert your Eucalyptus installation CD and press ENTER: "
-    sleep 5
-    mkdir -p /media/cdrom
-    mount /dev/cdrom /media/cdrom
-    CDNOTMOUNTED=`ls /media/cdrom/repodata/repomd.xml > /dev/null 2>&1 ; echo $?`
-    if [ $CDNOTMOUNTED -ne 0 ] ; then
-      echo "Unable to locate Eucalyptus installation CD.  Press Ctrl-C to abort."
-      echo ""
-    fi
+  CDORINTERNET=""
+  while ! echo "$CDORINTERNET" | grep -iE '(^cd$|^internet$)' > /dev/null ; do
+  echo "Which installation source would you like to use?"
+  echo ""
+  read -p "(cd/internet): " CDORINTERNET
+    case "$CDORINTERNET" in
+    Internet|internet)
+      echo "$(date)- Creating EMI from Internet repositories." | tee -a $LOGFILE
+      ;;
+    cd|CD)
+      echo "$(date)- Creating EMI from Eucalyptus installation CD." | tee -a $LOGFILE
+      CDNOTMOUNTED=`ls /media/cdrom/repodata/repomd.xml > /dev/null 2>&1 ; echo $?`
+      while [ $CDNOTMOUNTED -ne 0 ] ; do
+        read -p "Please insert your Eucalyptus installation CD and press ENTER: "
+        sleep 5
+        mkdir -p /media/cdrom
+        mount /dev/cdrom /media/cdrom
+        CDNOTMOUNTED=`ls /media/cdrom/repodata/repomd.xml > /dev/null 2>&1 ; echo $?`
+        if [ $CDNOTMOUNTED -ne 0 ] ; then
+          echo "Unable to locate Eucalyptus installation CD.  Press Ctrl-C to abort."
+          echo ""
+        fi
+      done
+      ;;
+    *)
+      echo "Please answer either 'cd' or 'internet'."
+      ;;
+    esac
   done
   IMAGESIZE=""
   while ! echo "$IMAGESIZE" | grep -iE '(^small$|^medium$|^large$)' > /dev/null ; do
@@ -618,19 +635,39 @@ none          /proc    proc   defaults       0 0
 none          /sys     sysfs  defaults       0 0
 EOF
   echo "$(date)- Installing packages in image." | tee -a $LOGFILE
-  case "$ELVERSION" in
-  "5")
-    yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ groupinstall 'Core'
-    yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl euca2ools euca2ools-release iptables iptables-ipv6 kernel-xen mdadm ntp openssh-clients parted selinux-policy unzip wget which zip
-    # Super minimal package set only.  Breakage may occur.
-    # yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl dhclient e2fsprogs euca2ools euca2ools-release grub iptables iptables-ipv6 kernel-xen logrotate lvm2 mdadm ntp openssh-clients openssh-server parted passwd policycoreutils rootfiles selinux-policy shadow-utils unzip vim-minimal vixie-cron wget which yum zip
-  ;;
-  "6")
-    yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ groupinstall 'Core'
-    yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl euca2ools euca2ools-release iptables iptables-ipv6 kernel mdadm ntp openssh-clients parted selinux-policy unzip wget which zip
-    # Super minimal package set only.  Breakage may occur.
-    # yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 cronie curl dhclient e2fsprogs euca2ools euca2ools-release grub iptables iptables-ipv6 kernel logrotate lvm2 mdadm ntp openssh-clients openssh-server parted passwd policycoreutils rootfiles selinux-policy shadow-utils unzip vim-minimal wget which yum zip
-  ;;
+  case "$CDORINTERNET" in
+  Internet|internet)
+    mkdir -p /mnt/image/var/lib/rpm
+    rpm --initdb --dbpath /mnt/image/var/lib/rpm
+    yumdownloader centos-release euca2ools-release
+    rpm -ivh --nodeps --root /mnt/image *release*.rpm
+    rm -f *release*.rpm
+    case "$ELVERSION" in
+    "5")
+      yum -y --nogpgcheck --installroot=/mnt/image/ groupinstall 'Core'
+      yum -y --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl euca2ools euca2ools-release iptables iptables-ipv6 kernel-xen mdadm ntp openssh-clients parted selinux-policy unzip wget which zip
+    ;;
+    "6")
+      yum -y --nogpgcheck --installroot=/mnt/image/ groupinstall 'Core'
+      yum -y --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl euca2ools euca2ools-release iptables iptables-ipv6 kernel mdadm ntp openssh-clients parted selinux-policy unzip wget which zip
+    ;;
+    esac
+    ;;
+  cd|CD)
+    case "$ELVERSION" in
+    "5")
+      yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ groupinstall 'Core'
+      yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl euca2ools euca2ools-release iptables iptables-ipv6 kernel-xen mdadm ntp openssh-clients parted selinux-policy unzip wget which zip
+    ;;
+    "6")
+      yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ groupinstall 'Core'
+      yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl euca2ools euca2ools-release iptables iptables-ipv6 kernel mdadm ntp openssh-clients parted selinux-policy unzip wget which zip
+    ;;
+    esac
+    echo "$(date)- Unmounting Eucalyptus installation CD." | tee -a $LOGFILE
+    umount /media/cdrom
+    rm -rf /media/cdrom
+    ;;
   esac
   echo "$(date)- Creating configuration files and scripts in image." | tee -a $LOGFILE
   sed -i -e 's/SELINUX=enforcing/SELINUX=disabled/' /mnt/image/etc/selinux/config
@@ -738,10 +775,8 @@ EOF
     cp /mnt/image/boot/init* ./
   ;;
   esac
-  echo "$(date)- Unmounting Eucalyptus installation CD and image file." | tee -a $LOGFILE
+  echo "$(date)- Unmounting and image file." | tee -a $LOGFILE
   sync
-  umount /media/cdrom
-  rm -rf /media/cdrom
   umount /mnt/image/proc
   umount /mnt/image
   rm -rf /mnt/image
@@ -860,9 +895,9 @@ echo "Virtual machine images (EMIs) are required to run instances in your cloud.
 echo ""
 echo "You can dowload starter images from http://emis.eucalyptus.com."
 echo ""
-echo "You can also create EMIs from the Eucalyptus installation CD."
+echo "You can also create EMIs from the Eucalyptus installation CD or Internet repositories."
 echo ""
-read -p "Would you like to create an EMI from the Eucalyptus installation CD? " CREATEEMI
+read -p "Would you like to create an EMI from the Eucalyptus installation CD or Internet repositories? " CREATEEMI
   case "$CREATEEMI" in
   y|Y|yes|YES|Yes)
     create_emi
