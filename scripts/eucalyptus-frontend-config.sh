@@ -552,6 +552,13 @@ function create_emi {
     case "$CDORINTERNET" in
     Internet|internet)
       echo "$(date)- Creating EMI from Internet repositories." | tee -a $LOGFILE
+      rpm -q yum-utils > /dev/null
+      if [ $? -eq 1 ] ; then
+        echo "$(date) - Installing yum-utils package." | tee -a $LOGFILE
+        yum -y install yum-utils > /dev/null
+      else
+        echo "$(date) - yum-utils package already installed." | tee -a $LOGFILE
+      fi
       ;;
     cd|CD)
       echo "$(date)- Creating EMI from Eucalyptus installation CD." | tee -a $LOGFILE
@@ -639,7 +646,7 @@ EOF
   Internet|internet)
     mkdir -p /mnt/image/var/lib/rpm
     rpm --initdb --dbpath /mnt/image/var/lib/rpm
-    yumdownloader centos-release euca2ools-release
+    yumdownloader centos-release epel-release euca2ools-release
     rpm -ivh --nodeps --root /mnt/image *release*.rpm
     rm -f *release*.rpm
     case "$ELVERSION" in
