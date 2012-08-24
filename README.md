@@ -12,6 +12,8 @@ only respond to mac addresses that start with D0:0D.)
 NOTE #2: Silvereye is not supported.  At all.  If you use it, there are ABSOLUTELY NO GUARANTEES that 
 it won't burn down your house, steal your pickup truck, or throw your mother into a wood-chipper.
 
+For basic installation instructions from the ISO itself, please see INSTALL.md.
+
 More documentation on Eucalyptus configuration can be found at:
 
 http://www.eucalyptus.com/eucalyptus-cloud/documentation
