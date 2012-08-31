@@ -100,6 +100,7 @@ if [ $STATICIPS -lt 1 ] ; then
     y|Y|yes|YES|Yes)
       echo "$(date)- Configuring network settings." | tee -a $LOGFILE
       system-config-network-tui
+      service network restart
       error_check
       echo "$(date)- Reconfigured network settings." | tee -a $LOGFILE
       ;;

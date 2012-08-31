@@ -44,7 +44,7 @@ EUCALYPTUSVERSION="3.1"
 # Set the ELVERSION variable
 ELVERSION=`cat /etc/redhat-release | sed -e 's/.* \([56]\).*/\1/'`
 
-# Exit if the script is not run with root privileges, or we're not running on CentOS 5 or 6
+# Exit if the script is not run with root privileges
 if [ "$EUID" != "0" ] ; then
   echo "This script must be run with root privileges."
   exit 1
@@ -81,6 +81,7 @@ esac
 # Copy configuration scripts
 cp ${BUILDDIR}/../scripts/eucalyptus-frontend-config.sh ${BUILDDIR}/isolinux/scripts/
 cp ${BUILDDIR}/../scripts/eucalyptus-nc-config.sh ${BUILDDIR}/isolinux/scripts/
+cp ${BUILDDIR}/../scripts/eucalyptus-create-emi.sh ${BUILDDIR}/isolinux/scripts/
 
 # Configure yum repositories
 ../scripts/configure_silvereye_yum_reops.sh | tee -a $SILVEREYELOGFILE

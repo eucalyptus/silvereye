@@ -105,7 +105,7 @@ if [ $ELVERSION -eq 5 ] ; then
   sed -i -e 's/    ("dopostaction", doPostAction, ),/#####/g' usr/lib/anaconda/dispatch.py
   sed -i -e 's/    ("methodcomplete", doMethodComplete, ),/    ("dopostaction", doPostAction, ),/g' usr/lib/anaconda/dispatch.py
   sed -i -e 's/#####/    ("methodcomplete", doMethodComplete, ),/g' usr/lib/anaconda/dispatch.py
-  mksquashfs . ${BUILDDIR}/tmp-anaconda-fix/stage2.img.new -all-root -no-fragments
+  mksquashfs . ${BUILDDIR}/tmp-anaconda-fix/stage2.img.new -all-root -no-fragments > /dev/null 2>&1
   rm -f ${BUILDDIR}/isolinux/images/stage2.img
   mv ${BUILDDIR}/tmp-anaconda-fix/stage2.img.new ${BUILDDIR}/isolinux/images/stage2.img
   cd ${BUILDDIR}
