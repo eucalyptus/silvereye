@@ -251,8 +251,8 @@ chroot /mnt/image chkconfig ip6tables off
 case "$ELVERSION" in
 "5")
   echo "$(date)- Generating ramdisk and copying kernel from Node Controller." | tee -a $LOGFILE
-  TEMPNODE=`euca_conf --list-nodes | awk '{print $2}' | head -n 1`
-  scp ${TEMPNODE}:/boot/vmlinuz* ./
+  TEMPNODE=`euca_conf --list-nodes 2>/dev/null | grep NODE | awk '{print $2}' | head -n 1`
+  scp ${TEMPNODE}:/boot/vmlinuz*xen ./
   ssh ${TEMPNODE} 'mkinitrd --omit-scsi-modules --with=xennet --with=xenblk --preload=xenblk /tmp/initrd-$(uname -r).img $(uname -r)'
   scp ${TEMPNODE}:/tmp/initrd-* ./
   ssh ${TEMPNODE} "rm -f /tmp/initrd-*"

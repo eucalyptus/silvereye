@@ -29,6 +29,14 @@ export LOGFILE=/var/log/eucalyptus-frontend-config.log
 # Set ELVERSION
 export ELVERSION=`cat /etc/redhat-release | sed -e 's/.* \([56]\).*/\1/'`
 
+# Set CIAB to Y for single server clouds
+rpm -q eucalyptus-nc > /dev/null
+if [ $? -eq 1 ] ; then
+  export CIAB="N"
+else
+  export CIAB="Y"
+fi
+
 # Error checking function
 function error_check {
   count=`grep -i 'error\|fail\|exception' $LOGFILE|wc -l`
@@ -104,6 +112,7 @@ if [ $STATICIPS -lt 1 ] ; then
     y|Y|yes|YES|Yes)
       echo "$(date)- Configuring network settings." | tee -a $LOGFILE
       system-config-network-tui
+      hostname `grep '^HOSTNAME=' /etc/sysconfig/network | sed -e 's/^HOSTNAME=//'`
       service network restart
       error_check
       echo "$(date)- Reconfigured network settings." | tee -a $LOGFILE
@@ -153,6 +162,7 @@ if [ $NAMESERVERS -lt 1 ] ; then
     y|Y|yes|YES|Yes)
       echo "$(date)- Configuring DNS settings." | tee -a $LOGFILE
       system-config-network-tui
+      hostname `grep '^HOSTNAME=' /etc/sysconfig/network | sed -e 's/^HOSTNAME=//'`
       service network restart
       error_check
       echo "$(date)- Reconfigured DNS settings." | tee -a $LOGFILE
@@ -183,6 +193,7 @@ while ! echo "$CONFIGURE_HOSTNAME" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null
     y|Y|yes|YES|Yes)
       echo "$(date)- Configuring DNS settings." | tee -a $LOGFILE
       system-config-network-tui
+      hostname `grep '^HOSTNAME=' /etc/sysconfig/network | sed -e 's/^HOSTNAME=//'`
       service network restart
       error_check
       echo "$(date)- Reconfigured DNS settings." | tee -a $LOGFILE
@@ -245,6 +256,207 @@ while ! echo "$ENABLE_NTP_SYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; 
 done
 echo ""
 
+# Create a bridge interface and configure networking for single server clouds
+if [ $CIAB = "Y" ] ; then
+  # Set NC_HYPERVISOR
+  case "$ELVERSION" in
+  "5")
+    NC_HYPERVISOR="xen"
+  ;;
+  "6")
+    NC_HYPERVISOR="kvm"
+  ;;
+  esac
+  # Edit the default eucalyptus.conf
+  sed -i -e "s/.*HYPERVISOR=\".*\"/HYPERVISOR=\"$NC_HYPERVISOR\"/" /etc/eucalyptus/eucalyptus.conf
+  sed --in-place 's/^VNET_MODE="SYSTEM"/#VNET_MODE="SYSTEM"/' /etc/eucalyptus/eucalyptus.conf >>$LOGFILE 2>&1
+  # Disable dnsmasq and ZEROCONF
+  service dnsmasq stop
+  chkconfig dnsmasq off
+  rm -f /etc/libvirt/qemu/networks/autostart/*
+  if ! grep -E '(^NOZEROCONF)' /etc/sysconfig/network > /dev/null
+  then
+    echo "NOZEROCONF=true" >> /etc/sysconfig/network
+  else
+    sed -i -e 's/NOZEROCONF=.*/NOZEROCONF=true/' /etc/sysconfig/network
+  fi
+  # Try to guess/set some apprpriate network settings for the virtual networks
+  echo "The single server configuration requires two virtual networks to function."
+  echo ""
+  echo "The addresses for these networks should not be in use on the rest of your network."
+  echo ""
+  if ! route -n | grep -E '^[[:digit:]]' | awk '{print $1}' | grep -E '^172\.' ; then
+    CIABBRIDGESUBNET="172.31.254.0"
+    CIABVNETSUBNET="172.31.252.0"
+    CIABBRIDGENETMASK="255.255.254.0"
+    CIABVNETNETMASK="255.255.254.0"
+  elif ! route -n | grep -E '^[[:digit:]]' | awk '{print $1}' | grep -E '^192\.' ; then
+    CIABBRIDGESUBNET="192.168.254.0"
+    CIABVNETSUBNET="192.168.252.0"
+    CIABBRIDGENETMASK="255.255.254.0"
+    CIABVNETNETMASK="255.255.254.0"
+  elif ! route -n | grep -E '^[[:digit:]]' | awk '{print $1}' | grep -E '^10\.' ; then
+    CIABBRIDGESUBNET="10.255.254.0"
+    CIABVNETSUBNET="10.255.252.0"
+    CIABBRIDGENETMASK="255.255.254.0"
+    CIABVNETNETMASK="255.255.254.0"
+  else
+    CIABBRIDGESUBNET="###.###.###.###"
+    CIABVNETSUBNET="###.###.###.###"
+    CIABBRIDGENETMASK="###.###.###.###"
+    CIABVNETNETMASK="###.###.###.###"
+  fi
+  case "$CIABBRIDGESUBNET" in
+  "###.###.###.###")
+    echo "The configuration script was unable to determine suitable networks to suggest."
+    echo ""
+    CHANGECIABNETWORKS="Y"
+    ;;
+  *)
+    CHANGECIABNETWORKS="N"
+    echo "Local Bridge subnet: $CIABBRIDGESUBNET"
+    echo "Local Bridge netmask: $CIABBRIDGENETMASK"
+    echo "Eucalyptus VNET_SUBNET: $CIABVNETSUBNET"
+    echo "Eucalyptus VNET_NETMASK: $CIABVNETNETMASK"
+    echo ""
+    read -p "Would you like to change these virtual network addresses [$CHANGECIABNETWORKS]" change_ciab_networks
+    if [ $change_ciab_networks ]
+    then
+      export CHANGECIABNETWORKS=$change_ciab_networks
+    fi
+    ;;
+  esac
+  while ! echo "$CHANGECIABNETWORKS" | grep -iE '(^n$|^no$)' > /dev/null ; do
+    read -p "Local Bridge Subnet [$CIABBRIDGESUBNET]" ciab_bridge_subnet
+    if [ $ciab_bridge_subnet ]
+    then
+      export CIABBRIDGESUBNET=$ciab_bridge_subnet
+    fi
+    read -p "Local Bridge netmask [$CIABBRIDGENETMASK]" ciab_bridge_netmask
+    if [ $ciab_bridge_netmask ]
+    then
+      export CIABBRIDGENETMASK=$ciab_bridge_netmask
+    fi
+    read -p "Eucalyptus VNET_SUBNET [$CIABVNETSUBNET]" ciab_vnet_subnet
+    if [ $ciab_vnet_subnet ]
+    then
+      export CIABVNETSUBNET=$ciab_vnet_subnet
+    fi
+    read -p "Eucalyptus VNET_NETMASK [$CIABVNETNETMASK]" ciab_vnet_netmask
+    if [ $ciab_vnet_netmask ]
+    then
+      export CIABVNETNETMASK=$ciab_vnet_netmask
+    fi
+    CHANGECIABNETWORKS="N"
+    echo "Local Bridge subnet: $CIABBRIDGESUBNET"
+    echo "Local Bridge netmask: $CIABBRIDGENETMASK"
+    echo "Eucalyptus VNET_SUBNET: $CIABVNETSUBNET"
+    echo "Eucalyptus VNET_NETMASK: $CIABVNETNETMASK"
+    echo ""
+    read -p "Would you like to change these virtual network addresses [$CHANGECIABNETWORKS]" change_ciab_networks
+    if [ $change_ciab_networks ]
+    then
+      export CHANGECIABNETWORKS=$change_ciab_networks
+    fi
+  done
+  CIABBRIDGEIP=`echo ${CIABBRIDGESUBNET} | sed -e 's/\.0$/.1/g'`
+  # Make some configuration changes based on user input and OS version
+  case "$ELVERSION" in
+  "5")
+    cat > /etc/sysconfig/network-scripts/ifcfg-xenbr0 <<EOF
+DEVICE=xenbr0
+ONBOOT=yes
+TYPE=Bridge
+BOOTPROTO=none
+NM_CONTROLLED=no
+EOF
+    echo "NETWORK=${CIABBRIDGESUBNET}" >> /etc/sysconfig/network-scripts/ifcfg-xenbr0
+    echo "NETMASK=${CIABBRIDGENETMASK}" >> /etc/sysconfig/network-scripts/ifcfg-xenbr0
+    echo "IPADDR=${CIABBRIDGEIP}" >> /etc/sysconfig/network-scripts/ifcfg-xenbr0
+    echo 'VNET_MODE="MANAGED-NOVLAN"' >> /etc/eucalyptus/eucalyptus.conf
+    echo "VNET_SUBNET=\"${CIABVNETSUBNET}\"" >> /etc/eucalyptus/eucalyptus.conf 
+    echo "VNET_NETMASK=\"${CIABVNETNETMASK}\"" >> /etc/eucalyptus/eucalyptus.conf
+    echo 'VNET_ADDRSPERNET="32"' >> /etc/eucalyptus/eucalyptus.conf
+    sed -i -e "s/^VNET_PRIVINTERFACE.*$/VNET_PRIVINTERFACE=\"xenbr0\"/" /etc/eucalyptus/eucalyptus.conf >>$LOGFILE 2>&1
+    service network restart >>$LOGFILE 2>&1
+    NC_PUBINTERFACE="xenbr0"
+    NC_BRIDGE="xenbr0"
+    sed -i -e "s/.*VNET_BRIDGE=\".*\"/VNET_BRIDGE=\"$NC_BRIDGE\"/" /etc/eucalyptus/eucalyptus.conf
+    # Edit the xen configuration files
+    echo "$(date) - Configuring xen" | tee -a $LOGFILE
+    sed -i -e "s/.*(xend-http-server .*/(xend-http-server yes)/" /etc/xen/xend-config.sxp >>$LOGFILE 2>&1
+    sed -i -e "s/.*(xend-address localhost)/(xend-address localhost)/" /etc/xen/xend-config.sxp >>$LOGFILE 2>&1
+    sed -i -e "s#^(network-script network-bridge)#(network-script /bin/true)#" /etc/xen/xend-config.sxp >>$LOGFILE 2>&1
+    sed -i -e "s/^(xend-relocation-hosts-allow/#(xend-relocation-hosts-allow/" /etc/xen/xend-config.sxp >>$LOGFILE 2>&1
+    sed -i -e "s/(dom0-min-mem 256)/(dom0-min-mem 196)/" /etc/xen/xend-config.sxp >>$LOGFILE 2>&1
+    sed -i -e "s/.*XENCONSOLED_LOG_GUESTS.*/XENCONSOLED_LOG_GUESTS=yes/" /etc/sysconfig/xend >>$LOGFILE 2>&1
+    service xend restart >>$LOGFILE 2>&1
+    error_check
+    echo "$(date) - Customized xen configuration" | tee -a $LOGFILE
+    # Edit the libvirt.conf file
+    echo "$(date) - Configuring libvirt " | tee -a $LOGFILE
+    sed -i -e 's/.*unix_sock_group.*/unix_sock_group = "eucalyptus"/' /etc/libvirt/libvirtd.conf >>$LOGFILE 2>&1
+    sed -i -e 's/.*unix_sock_ro_perms.*/unix_sock_ro_perms = "0777"/' /etc/libvirt/libvirtd.conf >>$LOGFILE 2>&1
+    sed -i -e 's/.*unix_sock_rw_perms.*/unix_sock_rw_perms = "0770"/' /etc/libvirt/libvirtd.conf >>$LOGFILE 2>&1
+    service libvirtd restart  >>$LOGFILE 2>&1
+    error_check
+    echo "$(date) - Customized libvirt configuration" | tee -a $LOGFILE
+    # Enable 256 loop devices
+    if [ ! -f /etc/modprobe.d/eucalyptus-loop ] ; then
+      echo "options loop max_loop=256" > /etc/modprobe.d/eucalyptus-loop
+      if lsmod | grep ^loop ; then
+        rmmod loop
+      fi
+      modprobe loop
+      echo "$(date) - Loop module customized" | tee -a $LOGFILE
+    else
+      echo "$(date) - Loop module already customized" | tee -a $LOGFILE
+    fi
+  ;;
+  "6")
+    cat > /etc/sysconfig/network-scripts/ifcfg-br0 <<EOF
+DEVICE=br0
+ONBOOT=yes
+TYPE=Bridge
+BOOTPROTO=none
+NM_CONTROLLED=no
+EOF
+    echo "NETWORK=${CIABBRIDGESUBNET}" >> /etc/sysconfig/network-scripts/ifcfg-br0
+    echo "NETMASK=${CIABBRIDGENETMASK}" >> /etc/sysconfig/network-scripts/ifcfg-br0
+    echo "IPADDR=${CIABBRIDGEIP}" >> /etc/sysconfig/network-scripts/ifcfg-br0
+    echo 'VNET_MODE="MANAGED-NOVLAN"' >> /etc/eucalyptus/eucalyptus.conf
+    echo "VNET_SUBNET=\"${CIABVNETSUBNET}\"" >> /etc/eucalyptus/eucalyptus.conf 
+    echo "VNET_NETMASK=\"${CIABVNETNETMASK}\"" >> /etc/eucalyptus/eucalyptus.conf
+    echo 'VNET_ADDRSPERNET="32"' >> /etc/eucalyptus/eucalyptus.conf
+    sed -i -e "s/^VNET_PRIVINTERFACE.*$/VNET_PRIVINTERFACE=\"br0\"/" /etc/eucalyptus/eucalyptus.conf >>$LOGFILE 2>&1
+    service network restart >>$LOGFILE 2>&1
+    NC_PUBINTERFACE="br0"
+    NC_BRIDGE="br0"
+    sed -i -e "s/.*VNET_BRIDGE=\".*\"/VNET_BRIDGE=\"$NC_BRIDGE\"/" /etc/eucalyptus/eucalyptus.conf
+    sed -i -e "s/#CREATE_NC_LOOP_DEVICES.*/CREATE_NC_LOOP_DEVICES=256/" /etc/eucalyptus/eucalyptus.conf
+    error_check
+    # Modify /etc/hosts if hostname is not resolvable
+    ping -c 1 `hostname` > /dev/null
+    if [ $? -ne 0 ] ; then
+      NC_PUB_IP_ADDRESS=`ip addr show $NC_BRIDGE |grep inet |grep global|awk -F"[\t /]*" '{ print $3 }'`
+      NC_HOSTNAME=`hostname`
+      NC_SHORTHOSTNAME=`hostname | cut -d. -f1`
+      if [ $NC_HOSTNAME = $NC_SHORTHOSTNAME ] ; then
+        echo "$NC_PUB_IP_ADDRESS ${NC_HOSTNAME}" >> /etc/hosts
+      else
+        echo "$NC_PUB_IP_ADDRESS ${NC_HOSTNAME} ${NC_SHORTHOSTNAME}" >> /etc/hosts
+      fi
+    fi
+    error_check
+  ;;
+  esac
+  # Start and configure eucalyptus-nc service
+  /etc/init.d/eucalyptus-nc start >>$LOGFILE 2>&1
+  error_check
+  /sbin/chkconfig eucalyptus-nc on >>$LOGFILE 2>&1
+  error_check
+fi
+
 # Generate root's SSH keys if they aren't already present
 if [ ! -f /root/.ssh/id_rsa ]
 then
@@ -299,27 +511,30 @@ fi
 echo ""
 echo "We need some network information"
 EUCACONFIG=/etc/eucalyptus/eucalyptus.conf
-edit_prop VNET_PUBINTERFACE "The public ethernet interface" $EUCACONFIG
-edit_prop VNET_PRIVINTERFACE "The private ethernet interface" $EUCACONFIG
-edit_prop VNET_DNS "The DNS server address" $EUCACONFIG "[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}"
-edit_prop VNET_SUBNET "Eucalyptus-only dedicated subnet" $EUCACONFIG "[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}"
-edit_prop VNET_NETMASK "Eucalyptus subnet netmask" $EUCACONFIG "[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}"
-SUBNET_VAL=`grep VNET_NETMASK $EUCACONFIG|tail -1|cut -d '=' -f 2|tr -d "\""`
-ZERO_OCTETS=`echo $SUBNET_VAL |tr "." "\n" |grep 0 |wc -l`
-ADDRSPER_REC=32
-if [ $ZERO_OCTETS -eq "3" ]     # class A subnet
-then
-  ADDRSPER_REC=128
-elif [ $ZERO_OCTETS -eq "2" ] # class B subnet
-then
-  ADDRSPER_REC=64
-elif [ $ZERO_OCTETS -eq "1" ] # class C subnet
-then
+if [ $CIAB = "N" ] ; then
+  edit_prop VNET_MODE "Which Eucalyptus networking mode would you like to use? " $EUCACONFIG
+  edit_prop VNET_PUBINTERFACE "The public ethernet interface" $EUCACONFIG
+  edit_prop VNET_PRIVINTERFACE "The private ethernet interface" $EUCACONFIG
+  edit_prop VNET_DNS "The DNS server address" $EUCACONFIG "[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}"
+  edit_prop VNET_SUBNET "Eucalyptus-only dedicated subnet" $EUCACONFIG "[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}"
+  edit_prop VNET_NETMASK "Eucalyptus subnet netmask" $EUCACONFIG "[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}"
+  SUBNET_VAL=`grep VNET_NETMASK $EUCACONFIG|tail -1|cut -d '=' -f 2|tr -d "\""`
+  ZERO_OCTETS=`echo $SUBNET_VAL |tr "." "\n" |grep 0 |wc -l`
   ADDRSPER_REC=32
+  if [ $ZERO_OCTETS -eq 3 ]     # class A subnet
+  then
+    ADDRSPER_REC=128
+  elif [ $ZERO_OCTETS -eq 2 ] # class B subnet
+  then
+    ADDRSPER_REC=64
+  elif [ $ZERO_OCTETS -eq 1 ] # class C subnet
+  then
+    ADDRSPER_REC=32
+  fi
+  echo "Based on the size of your private subnet, we recommend the next value be set to $ADDRSPER_REC"
+  sed --in-place "s/VNET_ADDRSPERNET=\"32\"/VNET_ADDRSPERNET=\"${ADDRSPER_REC}\"/" /etc/eucalyptus/eucalyptus.conf >>$LOGFILE 2>&1
+  edit_prop VNET_ADDRSPERNET "How many addresses per net?" $EUCACONFIG "[0-9]*"
 fi
-echo "Based on the size of your private subnet, we recommend the next value be set to $ADDRSPER_REC"
-sed --in-place "s/VNET_ADDRSPERNET=\"32\"/VNET_ADDRSPERNET=\"${ADDRSPER_REC}\"/" /etc/eucalyptus/eucalyptus.conf >>$LOGFILE 2>&1
-edit_prop VNET_ADDRSPERNET "How many addresses per net?" $EUCACONFIG "[0-9]*"
 echo ""
 echo "The range of public IP addresses should be two IP adresses on the public"
 echo "network separated by a - (e.g. '192.168.1.10-192.168.1.50')"
@@ -427,13 +642,22 @@ if [ ! -f /var/run/eucalyptus/eucalyptus-cloud.pid ] ; then
 fi
 /sbin/chkconfig eucalyptus-cloud on >>$LOGFILE 2>&1
 if [ ! -f /var/run/eucalyptus/eucalyptus-cc.pid ] ; then
+  retries=0
   curl http://localhost:8443/ >/dev/null 2>&1
   while [ $? -ne 0 ] ; do
     # Wait for CLC to start
     echo "Waiting for cloud controller to finish starting"
-    sleep 5
+    sleep 10
+    retries=$(($retries + 1))
+    if [ $retries -eq 30 ] ; then # this waits for 5 minutes
+      fail=true
+      break
+    fi
     curl http://localhost:8443/ >/dev/null 2>&1
   done
+  if [ $fail ] ; then
+    echo "$(date)- Cloud controller failed to start after 5 minutes. Check in /var/log/eucalyptus/startup.log" |tee -a $LOGFILE
+  fi
   service eucalyptus-cc start >> $LOGFILE 2>&1
 else
   service eucalyptus-cc restart >> $LOGFILE 2>&1
@@ -444,13 +668,21 @@ echo "$(date)- Started services " | tee -a $LOGFILE
 
 # Prepare to register components
 echo "$(date)- Registering components " | tee -a $LOGFILE
+retries=0
 curl http://localhost:8443/ >/dev/null 2>&1
-while [ $? -ne 0 ]
-do
+while [ $? -ne 0 ] ; do
   echo "Waiting for cloud controller to finish starting"
-    sleep 5
+    sleep 10
+    retries=$(($retries + 1))
+    if [ $retries -eq 30 ] ; then # this waits for 5 minutes
+      fail=true
+      break
+    fi
     curl http://localhost:8443/ >/dev/null 2>&1
 done
+if [ $fail ] ; then
+  echo "$(date)- Cloud controller failed to start after 5 minutes. Check in /var/log/eucalyptus/startup.log" |tee -a $LOGFILE
+fi
 export PUBLIC_INTERFACE=`grep -E '^VNET_PUBINTERFACE=' /etc/eucalyptus/eucalyptus.conf | cut -d\" -f2`
 export PRIVATE_INTERFACE=`grep -E '^VNET_PRIVINTERFACE=' /etc/eucalyptus/eucalyptus.conf | cut -d\" -f2`
 export PUBLIC_IP_ADDRESS=`ip addr show $PUBLIC_INTERFACE |grep inet |grep global|awk -F"[\t /]*" '{ print $3 }'`
@@ -470,7 +702,7 @@ echo "Using public IP $PUBLIC_IP_ADDRESS and private IP $PRIVATE_IP_ADDRESS to" 
 echo "register components" | tee -a $LOGFILE
 
 # Register Walrus
-if [ `/usr/sbin/euca_conf --list-walruses 2>/dev/null |wc -l` -eq '0' ]
+if [ `/usr/sbin/euca_conf --list-walruses 2>/dev/null |wc -l` -eq 0 ]
 then
   /usr/sbin/euca_conf --register-walrus --partition walrus --host $PUBLIC_IP_ADDRESS --component=walrus | tee -a $LOGFILE 
 else
@@ -503,25 +735,29 @@ do
 done
 
 # Register node controllers
-echo ""
-echo "Ready to register node controllers. Once they are installed, enter their IP"
-echo "addresses here, one by one (ENTER when done)"
-done="not"
-while [ $done != "done" ]
-do
-  read -p "Node IP (ENTER when done): " node
-  if [ ! $node ]
-  then
-    done="done"
-    echo "To register node controllers in the future, please run:"
-    echo '/usr/sbin/euca_conf --register-nodes "host host ..."'
-  else
-    echo "Please enter the root password of the node controller when prompted"
-    ssh-copy-id -i /root/.ssh/id_rsa.pub root@${node}
-    ssh root@${node} "service eucalyptus-nc restart"
-    /usr/sbin/euca_conf --register-nodes $node | tee -a $LOGFILE
-  fi
-done
+if [ $CIAB = "N" ] ; then
+  echo ""
+  echo "Ready to register node controllers. Once they are installed, enter their IP"
+  echo "addresses here, one by one (ENTER when done)"
+  done="not"
+  while [ $done != "done" ]
+  do
+    read -p "Node IP (ENTER when done): " node
+    if [ ! $node ]
+    then
+      done="done"
+      echo "To register node controllers in the future, please run:"
+      echo '/usr/sbin/euca_conf --register-nodes "host host ..."'
+    else
+      echo "Please enter the root password of the node controller when prompted"
+      ssh-copy-id -i /root/.ssh/id_rsa.pub root@${node}
+      ssh root@${node} "service eucalyptus-nc restart"
+      /usr/sbin/euca_conf --register-nodes $node | tee -a $LOGFILE
+    fi
+  done
+else
+  /usr/sbin/euca_conf --register-nodes $CIABBRIDGEIP | tee -a $LOGFILE
+fi
 error_check
 echo "$(date)- Registered components " | tee -a $LOGFILE
 echo ""
@@ -583,6 +819,15 @@ URL=https://REPLACE_PUBLIC_IP_ADDRESS:8443/
 Icon=gnome-fs-bookmark
 Name[en_US]=Eucalyptus Web Admin
 DESKTOPSHORTCUT
+  cat >> /home/${LOCALUSER}/Desktop/Eucalyptus_Docs.desktop << "DOCSSHORTCUT"
+[Desktop Entry]
+Encoding=UTF-8
+Name=Eucalyptus Documentation
+Type=Link
+URL=http://www.eucalyptus.com/docs
+Icon=gnome-fs-bookmark
+Name[en_US]=Eucalyptus Documentation
+DOCSSHORTCUT
   sed -i -e "s/REPLACE_PUBLIC_IP_ADDRESS/$PUBLIC_IP_ADDRESS/" /home/${LOCALUSER}/Desktop/Eucalyptus.desktop
   chown -R ${LOCALUSER}:${LOCALUSER} /home/${LOCALUSER}/Desktop
   cp -a /root/credentials /home/${LOCALUSER}/
@@ -718,4 +963,12 @@ case "$INSTALLDESKTOP" in
     echo ""
     ;;
 esac
+
+if [ $CIAB = "Y" ] ; then
+  if [ $ELVERSION = "5" ] ; then
+    echo "Your system needs to reboot to complete configuration changes."
+    read -p "Press ENTER to reboot." REBOOTME
+    shutdown -r now
+  fi
+fi
 
