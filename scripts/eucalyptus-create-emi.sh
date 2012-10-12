@@ -74,7 +74,7 @@ while ! echo "$IMAGESIZE" | grep -iE '(^small$|^medium$|^large$)' > /dev/null ; 
   echo "EMIs with larger root filesystems may take longer to launch, but provide more"
   echo "storage for the root partition."
   echo "EMIs with smaller root filesystems may launch quicker, but have limited storage"
-  echo "for the root filesystem."
+  echo "for the root partition."
   echo ""
   echo "You will not be able to run an EMI unless the instance type provides enough"
   echo "storage for the root filesystem."

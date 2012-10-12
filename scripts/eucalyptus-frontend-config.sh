@@ -20,6 +20,24 @@
 #   if you need additional information or have any questions.
 #  
 
+# Adding a spinner function, thanks to Louis Marascio for the snippet:
+# http://fitnr.com/showing-a-bash-spinner.html
+
+spinner()
+{
+    local pid=$1
+    local delay=0.75
+    local spinstr='|/-\'
+    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+        local temp=${spinstr#?}
+        printf " [%c]  " "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b\b\b\b"
+    done
+    printf "    \b\b\b\b"
+}
+
 # We need a default cluster name for registration
 export CLUSTER_NAME=cluster01
 
@@ -239,7 +257,8 @@ while ! echo "$ENABLE_NTP_SYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; 
     if [ -f /var/run/ntpd.pid ] ; then
       service ntpd stop
     fi
-    `which ntpd` -q -g >>$LOGFILE 2>&1
+    (`which ntpd` -q -g >>$LOGFILE 2>&1) & 
+    spinner $!
     hwclock --systohc >>$LOGFILE 2>&1
     chkconfig ntpd on >>$LOGFILE 2>&1
     service ntpd start >>$LOGFILE 2>&1
