@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Create the build directory structure
-mkdir -p ${BUILDDIR}/isolinux/{CentOS,images,ks,scripts}
-mkdir -p ${BUILDDIR}/isolinux/images/pxeboot
+mkdir -p ${BUILDDIR}/image/{CentOS,images,isolinux,ks,scripts}
+mkdir -p ${BUILDDIR}/image/images/pxeboot
 if [ $ELVERSION -eq 5 ] ; then
-  mkdir -p ${BUILDDIR}/isolinux/images/xen
+  mkdir -p ${BUILDDIR}/image/images/xen
 fi
 echo "$(date) - Created $BUILDDIR directory structure"
 
@@ -22,10 +22,12 @@ COMPSFILE=`curl -s ${FETCHMIRROR}repodata/ | grep 'comps.xml\"' | sed -e 's/.*hr
 wget ${FETCHMIRROR}/repodata/${COMPSFILE} > /dev/null 2>&1
 
 # Retrieve the files for the root filesystem of the CD
-wget ${FETCHMIRROR}/.discinfo -O isolinux/.discinfo > /dev/null 2>&1
+wget ${FETCHMIRROR}/.discinfo -O image/.discinfo > /dev/null 2>&1
 
 # Retrieve the files for the isolinux directory
-COMMONISOLINUXFILES="
+COMMONFILES="
+EULA
+GPL
 isolinux/boot.msg
 isolinux/initrd.img
 isolinux/isolinux.bin
@@ -33,8 +35,8 @@ isolinux/isolinux.cfg
 isolinux/memtest
 isolinux/vmlinuz
 "
-for FILE in $COMMONISOLINUXFILES ; do
-wget ${FETCHMIRROR}/${FILE} -O ${FILE} > /dev/null 2>&1
+for FILE in $COMMONFILES ; do
+wget ${FETCHMIRROR}/${FILE} -O image/${FILE} > /dev/null 2>&1
 done
 
 case "$ELVERSION" in
@@ -57,7 +59,7 @@ isolinux/vesamenu.c32
 esac
 
 for FILE in $ISOLINUXFILES ; do
-wget ${FETCHMIRROR}/${FILE} -O ${FILE} > /dev/null 2>&1
+wget ${FETCHMIRROR}/${FILE} -O image/${FILE} > /dev/null 2>&1
 done
 
 # Retrieve the files for the images directory
@@ -88,16 +90,17 @@ pxeboot/vmlinuz
 esac
 
 for FILE in $IMAGESFILES ; do
-wget ${FETCHMIRROR}/images/${FILE} -O ./isolinux/images/${FILE} > /dev/null 2>&1
+wget ${FETCHMIRROR}/images/${FILE} -O ./image/images/${FILE} > /dev/null 2>&1
 done
 
-# Fix EL5 anaconda bug to allow copying files from CD during %post scripts
-if [ $ELVERSION -eq 5 ] ; then
+# Fix anaconda bugs to allow copying files from CD during %post scripts in EL5, and network prompting in EL6
+case "$ELVERSION" in
+"5")
   mkdir tmp-anaconda-fix
   cd tmp-anaconda-fix
   mkdir anaconda
   mkdir anaconda-new
-  mount -rw -t squashfs -o loop ${BUILDDIR}/isolinux/images/stage2.img anaconda/
+  mount -rw -t squashfs -o loop ${BUILDDIR}/image/images/stage2.img anaconda/
   cd anaconda
   tar cf - * .buildstamp | ( cd ${BUILDDIR}/tmp-anaconda-fix/anaconda-new; tar xfp -)
   cd ../anaconda-new
@@ -106,10 +109,14 @@ if [ $ELVERSION -eq 5 ] ; then
   sed -i -e 's/    ("methodcomplete", doMethodComplete, ),/    ("dopostaction", doPostAction, ),/g' usr/lib/anaconda/dispatch.py
   sed -i -e 's/#####/    ("methodcomplete", doMethodComplete, ),/g' usr/lib/anaconda/dispatch.py
   mksquashfs . ${BUILDDIR}/tmp-anaconda-fix/stage2.img.new -all-root -no-fragments > /dev/null 2>&1
-  rm -f ${BUILDDIR}/isolinux/images/stage2.img
-  mv ${BUILDDIR}/tmp-anaconda-fix/stage2.img.new ${BUILDDIR}/isolinux/images/stage2.img
+  rm -f ${BUILDDIR}/image/images/stage2.img
+  mv ${BUILDDIR}/tmp-anaconda-fix/stage2.img.new ${BUILDDIR}/image/images/stage2.img
   cd ${BUILDDIR}
   rm -rf tmp-anaconda-fix
   echo "$(date) - Created patched stage2.img"
-fi
+  ;;
+"6")
+  # EL6 anaconda hacks to go here
+  ;;
+esac
 

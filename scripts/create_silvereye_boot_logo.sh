@@ -4,7 +4,7 @@
 echo "$(date) - Creating boot logo"
 mkdir -p ${BUILDDIR}/tmplogo
 cd ${BUILDDIR}/tmplogo
-rpm2cpio ${BUILDDIR}/isolinux/CentOS/eucalyptus-common-java-*.rpm | cpio -idmv ./var/lib/eucalyptus/webapps/root.war > /dev/null 2>&1
+rpm2cpio ${BUILDDIR}/image/CentOS/eucalyptus-common-java-*.rpm | cpio -idmv ./var/lib/eucalyptus/webapps/root.war > /dev/null 2>&1
 jar -xf ./var/lib/eucalyptus/webapps/root.war > /dev/null 2>&1
 case "$ELVERSION" in
 "5")
@@ -27,8 +27,8 @@ case "$ELVERSION" in
   composite -gravity south -geometry +0+50 large-logo.png gradient_background.png splash.jpg
 ;;
 esac
-rm -f ${BUILDDIR}/isolinux/splash.*
-mv splash.* ${BUILDDIR}/isolinux/
+rm -f ${BUILDDIR}/image/isolinux/splash.*
+mv splash.* ${BUILDDIR}/image/isolinux/
 cd ..
 rm -rf tmplogo
 

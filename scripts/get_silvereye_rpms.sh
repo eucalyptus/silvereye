@@ -197,7 +197,7 @@ yum-plugin-fastestmirror.noarch zd1211-firmware.noarch zip.x86_64 zlib.x86_64"
 esac
 
 # Download the base rpms
-cd ${BUILDDIR}/isolinux/CentOS
+cd ${BUILDDIR}/image/CentOS
 echo "$(date) - Retrieving packages"
 yumdownloader ${RPMS} > /dev/null
 

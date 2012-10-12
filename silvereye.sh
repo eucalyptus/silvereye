@@ -79,9 +79,9 @@ esac
 ../scripts/create_silvereye_kickstarts.sh
 
 # Copy configuration scripts
-cp ${BUILDDIR}/../scripts/eucalyptus-frontend-config.sh ${BUILDDIR}/isolinux/scripts/
-cp ${BUILDDIR}/../scripts/eucalyptus-nc-config.sh ${BUILDDIR}/isolinux/scripts/
-cp ${BUILDDIR}/../scripts/eucalyptus-create-emi.sh ${BUILDDIR}/isolinux/scripts/
+cp ${BUILDDIR}/../scripts/eucalyptus-frontend-config.sh ${BUILDDIR}/image/scripts/
+cp ${BUILDDIR}/../scripts/eucalyptus-nc-config.sh ${BUILDDIR}/image/scripts/
+cp ${BUILDDIR}/../scripts/eucalyptus-create-emi.sh ${BUILDDIR}/image/scripts/
 
 # Configure yum repositories
 ../scripts/configure_silvereye_yum_reops.sh | tee -a $SILVEREYELOGFILE
