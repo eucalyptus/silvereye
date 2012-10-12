@@ -20,6 +20,24 @@
 #   if you need additional information or have any questions.
 #  
 
+# Adding a spinner function, thanks to Louis Marascio for the snippet:
+# http://fitnr.com/showing-a-bash-spinner.html
+
+spinner()
+{
+    local pid=$1
+    local delay=0.75
+    local spinstr='|/-\'
+    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+        local temp=${spinstr#?}
+        printf " [%c]  " "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b\b\b\b"
+    done
+    printf "    \b\b\b\b"
+}
+
 # We need a default cluster name for registration
 export CLUSTER_NAME=cluster01
 
@@ -239,7 +257,8 @@ while ! echo "$ENABLE_NTP_SYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; 
     if [ -f /var/run/ntpd.pid ] ; then
       service ntpd stop
     fi
-    `which ntpd` -q -g >>$LOGFILE 2>&1
+    (`which ntpd` -q -g >>$LOGFILE 2>&1) & 
+    spinner $!
     hwclock --systohc >>$LOGFILE 2>&1
     chkconfig ntpd on >>$LOGFILE 2>&1
     service ntpd start >>$LOGFILE 2>&1
@@ -877,20 +896,17 @@ get_credentials
 
 # Ask the user if they would like to create an EMI from the installation CD
 CREATEEMI=""
+ANTEXT="an"
 while ! echo "$CREATEEMI" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
 echo "Virtual machine images (EMIs) are required to run instances in your cloud."
 echo ""
-echo "You can dowload starter images from http://emis.eucalyptus.com."
-echo ""
-echo "You can also create EMIs from the Eucalyptus installation CD or Internet repositories."
-echo ""
-read -p "Would you like to create an EMI from the Eucalyptus installation CD or Internet repositories? " CREATEEMI
+read -p "Would you like to create $ANTEXT EMI now? (y|n)" CREATEEMI
   case "$CREATEEMI" in
   y|Y|yes|YES|Yes)
     eucalyptus-create-emi.sh
     error_check
     CREATEEMI=""
-    echo "Answer 'no' when you are done creating EMIs."
+    ANTEXT="another"
     echo ""
     ;;
   n|N|no|NO|No)
@@ -905,7 +921,9 @@ done
 # Ask the user if they would like to install a graphical desktop on the Frontend server
 INSTALLDESKTOP=""
 while ! echo "$INSTALLDESKTOP" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
-echo "If you have Internet access, you can optionally install a graphical desktop."
+echo "If you have Internet access, you can optionally install a graphical desktop,"
+echo "which will allow you to test web access to your new cloud from this system."
+echo ""
 echo "This will download approximately 300 MB of packages, which may take a long time,"
 echo "depending on the speed of your Internet connection."
 echo ""
