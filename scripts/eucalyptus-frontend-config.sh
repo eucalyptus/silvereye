@@ -924,7 +924,9 @@ done
 # Ask the user if they would like to install a graphical desktop on the Frontend server
 INSTALLDESKTOP=""
 while ! echo "$INSTALLDESKTOP" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
-echo "If you have Internet access, you can optionally install a graphical desktop."
+echo "If you have Internet access, you can optionally install a graphical desktop,"
+echo "which will allow you to test web access to your new cloud from this system."
+echo ""
 echo "This will download approximately 300 MB of packages, which may take a long time,"
 echo "depending on the speed of your Internet connection."
 echo ""
