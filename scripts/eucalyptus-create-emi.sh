@@ -63,29 +63,20 @@ read -p "(cd/internet): " CDORINTERNET
 done
 IMAGESIZE=""
 while ! echo "$IMAGESIZE" | grep -iE '(^small$|^medium$|^large$)' > /dev/null ; do
-  echo "There are several instance types available, each with different virtual disk"
-  echo "sizes."
+  echo "The default instance type/disk sizes for EMIs are:"
+  echo "small:   2 GB (1.5 GB root, 512 MB swap)"
+  echo "medium:  5 GB (4.5 GB root, 512 MB swap)"
+  echo "large:  10 GB (9.5 GB root, 512 MB swap)"
   echo ""
-  echo "The default instance type/disk sizes are:"
-  echo "small:   2 GB"
-  echo "medium:  5 GB"
-  echo "large:  10 GB"
-  echo ""
-  echo "EMIs with larger root filesystems may take longer to launch, but provide more"
-  echo "storage for the root partition."
-  echo "EMIs with smaller root filesystems may launch quicker, but have limited storage"
-  echo "for the root partition."
-  echo ""
-  echo "You will not be able to run an EMI unless the instance type provides enough"
-  echo "storage for the root filesystem."
-  echo "i.e. If you attempt to run a large EMI using a small instance type, it will"
-  echo "fail to launch."
+  echo "A smaller EMI will be quicker to launch, but will provide less storage."
+  echo "A larger EMI will be incompatible with small instance types (i.e. "
+  echo "an m1.small instance started with a large EMI will fail to launch.)"
   echo ""
   echo "When you launch an instance, any storage provided by the instance type that is"
   echo "greater than the root filesystem + 512 MB swap is allocated as an 'ephemeral'"
   echo "storage partition."
   echo ""
-  read -p "Would you like a small (1.5GB), medium (4.5GB), or large (9.5GB) root filesystem for your EMI? " IMAGESIZE
+  read -p "Would you like a small, medium, or large root filesystem for this EMI? " IMAGESIZE
   case "$IMAGESIZE" in
   "small")
     SEEKBLOCKS=1533
