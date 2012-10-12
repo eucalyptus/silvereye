@@ -896,20 +896,17 @@ get_credentials
 
 # Ask the user if they would like to create an EMI from the installation CD
 CREATEEMI=""
+ANTEXT="an"
 while ! echo "$CREATEEMI" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
 echo "Virtual machine images (EMIs) are required to run instances in your cloud."
 echo ""
-echo "You can dowload starter images from http://emis.eucalyptus.com."
-echo ""
-echo "You can also create EMIs from the Eucalyptus installation CD or Internet repositories."
-echo ""
-read -p "Would you like to create an EMI from the Eucalyptus installation CD or Internet repositories? " CREATEEMI
+read -p "Would you like to create $ANTEXT EMI now? (y|n)" CREATEEMI
   case "$CREATEEMI" in
   y|Y|yes|YES|Yes)
     eucalyptus-create-emi.sh
     error_check
     CREATEEMI=""
-    echo "Answer 'no' when you are done creating EMIs."
+    ANTEXT="another"
     echo ""
     ;;
   n|N|no|NO|No)
