@@ -43,6 +43,9 @@ STEP 3: Get your silvereye ISO.  Go get it from here and burn it to DVD:
 
 http://downloads.eucalyptus.com/software/contrib/silvereye/
 
+*NOTE: If you're doing a Cloud-in-a-Box install, go directly to STEP 6, as the node
+controller will be configured automatically.*
+
 STEP 4: Boot your first machine, which will be a node controller, with your Silvereye DVD.  When you get 
 to the pretty Eucalyptus boot prompt, you will see several options, the first of which should be 
 "Install CentOS 6 with Eucalyptus Node Controller."  Pick that option and hit enter.  You will then be 
