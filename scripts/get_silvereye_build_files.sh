@@ -96,24 +96,27 @@ done
 # Fix anaconda bugs to allow copying files from CD during %post scripts in EL5, and network prompting in EL6
 case "$ELVERSION" in
 "5")
-  mkdir tmp-anaconda-fix
-  cd tmp-anaconda-fix
-  mkdir anaconda
-  mkdir anaconda-new
-  mount -rw -t squashfs -o loop ${BUILDDIR}/image/images/stage2.img anaconda/
-  cd anaconda
-  tar cf - * .buildstamp | ( cd ${BUILDDIR}/tmp-anaconda-fix/anaconda-new; tar xfp -)
-  cd ../anaconda-new
-  umount ${BUILDDIR}/tmp-anaconda-fix/anaconda
-  sed -i -e 's/    ("dopostaction", doPostAction, ),/#####/g' usr/lib/anaconda/dispatch.py
-  sed -i -e 's/    ("methodcomplete", doMethodComplete, ),/    ("dopostaction", doPostAction, ),/g' usr/lib/anaconda/dispatch.py
-  sed -i -e 's/#####/    ("methodcomplete", doMethodComplete, ),/g' usr/lib/anaconda/dispatch.py
-  mksquashfs . ${BUILDDIR}/tmp-anaconda-fix/stage2.img.new -all-root -no-fragments > /dev/null 2>&1
-  rm -f ${BUILDDIR}/image/images/stage2.img
-  mv ${BUILDDIR}/tmp-anaconda-fix/stage2.img.new ${BUILDDIR}/image/images/stage2.img
+  echo "$(date) - Creating updates.img"
+  mkdir -p tmp-anaconda-updates/{stage2,updates}
+  cd tmp-anaconda-updates
+  mount -rw -t squashfs -o loop ${BUILDDIR}/image/images/stage2.img stage2
+  dd if=/dev/zero of=updates.img bs=1K count=1 seek=127 > /dev/null 2>&1
+  parted updates.img mklabel msdos
+  mkfs.ext2 -F -L updates updates.img > /dev/null 2>&1
+  losetup -f updates.img
+  UPDATESLOOPDEVICE=`losetup -a | grep -E "updates.img" | awk '{print $1}' | sed 's/://g'`
+  mount $UPDATESLOOPDEVICE updates
+  cp stage2/usr/lib/anaconda/dispatch.py updates/
+  sed -i -e 's/    ("dopostaction", doPostAction, ),/#####/g' updates/dispatch.py
+  sed -i -e 's/    ("methodcomplete", doMethodComplete, ),/    ("dopostaction", doPostAction, ),/g' updates/dispatch.py
+  sed -i -e 's/#####/    ("methodcomplete", doMethodComplete, ),/g' updates/dispatch.py
+  umount stage2
+  umount updates
+  losetup -d $UPDATESLOOPDEVICE
+  mv updates.img ${BUILDDIR}/image/images/
   cd ${BUILDDIR}
   rm -rf tmp-anaconda-fix
-  echo "$(date) - Created patched stage2.img"
+  echo "$(date) - Created updates.img"
   ;;
 "6")
   # EL6 anaconda hacks to go here
