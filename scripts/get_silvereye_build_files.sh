@@ -115,7 +115,7 @@ case "$ELVERSION" in
   losetup -d $UPDATESLOOPDEVICE
   mv updates.img ${BUILDDIR}/image/images/
   cd ${BUILDDIR}
-  rm -rf tmp-anaconda-fix
+  rm -rf tmp-anaconda-updates
   echo "$(date) - Created updates.img"
   ;;
 "6")
@@ -132,7 +132,7 @@ case "$ELVERSION" in
   gzip updates.img.tmp
   mv updates.img.tmp.gz ${BUILDDIR}/image/images/updates.img
   cd ${BUILDDIR}
-  rm -rf tmp-anaconda-fix
+  rm -rf tmp-anaconda-updates
   echo "$(date) - Created updates.img"
   ;;
 esac
