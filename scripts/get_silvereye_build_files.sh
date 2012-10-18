@@ -93,7 +93,7 @@ for FILE in $IMAGESFILES ; do
 wget ${FETCHMIRROR}/images/${FILE} -O ./image/images/${FILE} > /dev/null 2>&1
 done
 
-# Fix anaconda bugs to allow copying files from CD during %post scripts in EL5, and network prompting in EL6
+# Customize anaconda to allow copying files from CD during %post scripts in EL5, and network prompting in EL6
 case "$ELVERSION" in
 "5")
   echo "$(date) - Creating updates.img"
@@ -119,7 +119,21 @@ case "$ELVERSION" in
   echo "$(date) - Created updates.img"
   ;;
 "6")
-  # EL6 anaconda hacks to go here
+  echo "$(date) - Creating updates.img"
+  mkdir -p tmp-anaconda-updates/{install,updates}
+  cd tmp-anaconda-updates
+  mount -rw -t squashfs -o loop ${BUILDDIR}/image/images/install.img install/
+  cp install/usr/lib/anaconda/kickstart.py updates/
+  umount install
+  sed -i '/dispatch.skipStep.*network/d' updates/kickstart.py
+  cd updates
+  find . | cpio -H newc -o > ../updates.img.tmp
+  cd ..
+  gzip updates.img.tmp
+  mv updates.img.tmp.gz ${BUILDDIR}/image/images/updates.img
+  cd ${BUILDDIR}
+  rm -rf tmp-anaconda-fix
+  echo "$(date) - Created updates.img"
   ;;
 esac
 
