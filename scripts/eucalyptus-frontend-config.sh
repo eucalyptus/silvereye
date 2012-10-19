@@ -598,15 +598,17 @@ export PRIVATE_INTERFACE=`grep -E '^VNET_PRIVINTERFACE=' /etc/eucalyptus/eucalyp
 export PUBLIC_IP_ADDRESS=`ip addr show $PUBLIC_INTERFACE |grep inet |grep global|awk -F"[\t /]*" '{ print $3 }'`
 export PRIVATE_IP_ADDRESS=`ip addr show $PRIVATE_INTERFACE |grep inet |grep global|awk -F"[\t /]*" '{ print $3 }'`
 # Prompt for ip confirm
-read -p "Public IP for Cloud Controller and Walrus [$PUBLIC_IP_ADDRESS]" public_ip
-read -p "Private IP for Cluster Controller and Storage Controller [$PRIVATE_IP_ADDRESS]" private_ip
-if [ $public_ip ]
-then
-  export PUBLIC_IP_ADDRESS=$public_ip
-fi
-if [ $private_ip ]
-then
-  export PRIVATE_IP_ADDRESS=$private_ip
+if [ $CIAB = "N" ] ; then
+  read -p "Public IP for Cloud Controller and Walrus [$PUBLIC_IP_ADDRESS]" public_ip
+  read -p "Private IP for Cluster Controller and Storage Controller [$PRIVATE_IP_ADDRESS]" private_ip
+  if [ $public_ip ]
+  then
+    export PUBLIC_IP_ADDRESS=$public_ip
+  fi
+  if [ $private_ip ]
+  then
+    export PRIVATE_IP_ADDRESS=$private_ip
+  fi
 fi
 echo "Using public IP $PUBLIC_IP_ADDRESS and private IP $PRIVATE_IP_ADDRESS to" | tee -a $LOGFILE
 echo "register components" | tee -a $LOGFILE
@@ -751,27 +753,33 @@ DOCSSHORTCUT
 
 # User interaction starts here
 echo ""
-echo "Welcome to the Eucalyptus frontend configuration script."
+echo "Welcome to the Eucalyptus configuration script."
 echo ""
-echo "It is recommended that the Node Controllers are installed and configured prior"
-echo "to continuing this Frontend configuration."
-echo ""
+if [ $CIAB = "N" ] ; then
+  echo "It is recommended that the Node Controllers are installed and configured prior"
+  echo "to continuing this Frontend configuration."
+  echo ""
+fi
 CONFIGUREFRONTEND=""
 while ! echo "$CONFIGUREFRONTEND" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
-  read -p "Would you like to configure your Frontend server now? " CONFIGUREFRONTEND
+  if [ -f /var/log/eucalyptus/cloud-output.log ] ; then
+    read -p "Would you like to reconfigure your Eucalyptus services now? " CONFIGUREFRONTEND
+  else
+    CONFIGUREFRONTEND="yes"
+  fi
   case "$CONFIGUREFRONTEND" in
   y|Y|yes|YES|Yes)
-    echo "$(date)- Configuring Frontend." | tee -a $LOGFILE
+    echo "$(date)- Configuring Eucalyptus services." | tee -a $LOGFILE
     configure_frontend
-    echo "$(date)- Configured Frontend." | tee -a $LOGFILE
+    echo "$(date)- Configured Eucalyptus services." | tee -a $LOGFILE
     echo ""
-    echo "This machine is ready and running as a Frontend."
+    echo "This machine is ready and running as a Cloud Controller."
     echo ""
     ;;
   n|N|no|NO|No)
-    echo "$(date)- Skipped Frontend configuration." | tee -a $LOGFILE
+    echo "$(date)- Skipped Eucalyptus service configuration." | tee -a $LOGFILE
     echo ""
-    echo "You can re-run this configuration scipt later by executing"
+    echo "You can re-run this configuration script later by executing"
     echo "/usr/local/sbin/eucalyptus-frontend-config.sh as root."
     echo ""
     exit 0

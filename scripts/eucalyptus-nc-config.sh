@@ -277,7 +277,7 @@ error_check
 error_check
 
 echo "This machine is ready and running as a Node Controller."
-echo "You can re-run this configuration scipt  later by executing"
+echo "You can re-run this configuration script later by executing"
 echo "/usr/local/sbin/eucalyptus-nc-config.sh as root."
 echo ""
 echo "After all Node Controllers are installed and configured, install and configure"

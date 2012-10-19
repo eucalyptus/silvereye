@@ -254,7 +254,7 @@ case "$ELVERSION" in
   cp /mnt/image/boot/init* ./
 ;;
 esac
-echo "$(date)- Unmounting and image file." | tee -a $LOGFILE
+echo "$(date)- Unmounting image file." | tee -a $LOGFILE
 sync
 umount /mnt/image/proc
 umount /mnt/image
