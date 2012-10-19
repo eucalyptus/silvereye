@@ -10,6 +10,7 @@ case "$ELVERSION" in
   ;;
 "6")
   cd ${BUILDDIR}/image/isolinux
+  sed -i -e 's/Press the.*installation process/Please wait while the boot menu is loaded\.\./' boot.msg
   sed -i -e '/  menu default/d' isolinux.cfg
   sed -i -e 's/^\(  menu label Boot from .*drive\)$/\1\n  menu default/g' isolinux.cfg
   sed -i -e 's/label linux/label nc/' isolinux.cfg
