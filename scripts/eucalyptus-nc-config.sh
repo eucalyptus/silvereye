@@ -26,6 +26,24 @@ export LOGFILE=/var/log/eucalyptus-nc-config.log
 # Set ELVERSION
 export ELVERSION=`cat /etc/redhat-release | sed -e 's/.* \([56]\).*/\1/'`
 
+# Adding a spinner function, thanks to Louis Marascio for the snippet:
+# http://fitnr.com/showing-a-bash-spinner.html
+
+spinner()
+{
+    local pid=$1
+    local delay=0.75
+    local spinstr='|/-\'
+    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+        local temp=${spinstr#?}
+        printf " [%c]  " "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b\b\b\b"
+    done
+    printf "    \b\b\b\b"
+}
+
 # Error checking function
 function error_check {
   count=`grep -i 'error\|fail\|exception' $LOGFILE|wc -l`
@@ -118,7 +136,8 @@ while ! echo "$ENABLE_NTP_SYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; 
     if [ -f /var/run/ntpd.pid ] ; then
       service ntpd stop
     fi
-    `which ntpd` -q -g >>$LOGFILE 2>&1
+    (`which ntpd` -q -g >>$LOGFILE 2>&1) &
+    spinner $!
     hwclock --systohc >>$LOGFILE 2>&1
     chkconfig ntpd on >>$LOGFILE 2>&1
     service ntpd start >>$LOGFILE 2>&1
@@ -214,9 +233,11 @@ case "$ELVERSION" in
     echo "$(date) - Creating bridge $NC_BRIDGE on $NC_PUBINTERFACE" | tee -a $LOGFILE
     if [ ! -f /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE} ] ; then
       cp /etc/sysconfig/network-scripts/ifcfg-${NC_PUBINTERFACE} /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE}
-      sed -i -e "s/DEVICE=${NC_PUBINTERFACE}/DEVICE=${NC_BRIDGE}/" /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE}
+      sed -i -e "s/DEVICE=.*/DEVICE=\"${NC_BRIDGE}\"/" /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE}
       sed -i -e '/HWADDR=/d' /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE}
-      sed -i -e 's/TYPE=Ethernet/TYPE=Bridge/g' /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE}
+      sed -i -e '/UUID=/d' /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE}
+      sed -i -e '/NAME=/d' /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE}
+      sed -i -e 's/TYPE=.*/TYPE="Bridge"/g' /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE}
       if ! grep -E 'TYPE' /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE} > /dev/null ; then
         echo "TYPE=Bridge" >> /etc/sysconfig/network-scripts/ifcfg-${NC_BRIDGE}
       fi
