@@ -187,8 +187,7 @@ class SilvereyeBuilder(yum.YumBase):
 
   def installBuildDeps(self):
     # Install silvereye dependencies
-    deps = set([ 'curl', 'wget',
-                 'yum-utils', 'createrepo',
+    deps = set([ 'yum-utils', 'createrepo',
                  'ImageMagick', 'syslinux' ])
 
     if self.distroversion == "5":
@@ -311,11 +310,14 @@ class SilvereyeBuilder(yum.YumBase):
         self.logger.warning("Not running as root; attempting to use sudo for mount/umount")
         sudo = ['sudo']
 
-      subprocess.call(["dd", "if=/dev/zero", "of=" + updatesimg,
-                       "bs=1K", "count=1", "seek=127"])
+      imgfile = open(updatesimg, 'w')
+      imgfile.seek(128 * 1024)
+      imgfile.write('\0')
+      imgfile.close()
+
       subprocess.call(["/sbin/mkfs.ext2", "-F", "-L", "updates", updatesimg])
       subprocess.call(sudo + [ "/bin/mount", "-o", "loop", updatesimg, updatesdir ])
-      subprocess.call([ "chmod", "777", updatesdir ])
+      os.chmod(updatesdir, 0777)
       f = open('/usr/lib/anaconda/dispatch.py', 'r')
       g = open('updates/dispatch.py', 'w')
       for line in f.readlines():
@@ -502,9 +504,7 @@ class SilvereyeBuilder(yum.YumBase):
     mkdir(tmplogo)
     javarpm = [ x for x in os.listdir(self.pkgdir) if x.startswith('eucalyptus-common-java-3') ][0]
 
-    # XXX hacky - switch to pipes?
-    rpmfile = os.path.join(self.pkgdir, javarpm)
-    p1 = subprocess.Popen(["rpm2cpio", rpmfile ], stdout=subprocess.PIPE)
+    p1 = subprocess.Popen(["rpm2cpio", os.path.join(self.pkgdir, javarpm) ], stdout=subprocess.PIPE)
     p2 = subprocess.Popen(['cpio', '-idm', './var/lib/eucalyptus/webapps/root.war' ], 
                           stdin=p1.stdout, cwd=tmplogo)
     p1.stdout.close()
@@ -541,8 +541,6 @@ class SilvereyeBuilder(yum.YumBase):
 
 if __name__ == "__main__":
   args = parser.parse_args()
-
-  # TODO: at least make sudo work?
 
   sys.excepthook = gen_except_hook(args.debugger, args.debug)
 
