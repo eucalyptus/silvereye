@@ -2,6 +2,25 @@
 #
 # Create instance store-backed EMI
 #
+
+# Adding a spinner function, thanks to Louis Marascio for the snippet:
+# http://fitnr.com/showing-a-bash-spinner.html
+
+spinner()
+{
+    local pid=$1
+    local delay=0.75
+    local spinstr='|/-\'
+    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+        local temp=${spinstr#?}
+        printf " [%c]  " "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b\b\b\b"
+    done
+    printf "    \b\b\b\b"
+}
+
 # Exit if the script is not run with root privileges
 if [ "$EUID" != "0" ] ; then
   echo "This script must be run with root privileges."
@@ -27,16 +46,24 @@ fi
 
 CDORINTERNET=""
 while ! echo "$CDORINTERNET" | grep -iE '(^cd$|^internet$)' > /dev/null ; do
-echo "Which installation source would you like to use?"
-echo ""
-read -p "(cd/internet): " CDORINTERNET
+  CDORINTERNET="Internet"
+  echo ""
+  echo "Which installation source would you like to use?"
+  echo ""
+  read -p "(CD/Internet): [$CDORINTERNET] " cd_or_internet
+  if [ $cd_or_internet ]
+  then
+    export CDORINTERNET=$cd_or_internet
+  fi
+  echo ""
   case "$CDORINTERNET" in
   Internet|internet)
     echo "$(date)- Creating EMI from Internet repositories." | tee -a $LOGFILE
     rpm -q yum-utils > /dev/null
     if [ $? -eq 1 ] ; then
       echo "$(date) - Installing yum-utils package." | tee -a $LOGFILE
-      yum -y install yum-utils > /dev/null
+      (yum -y install yum-utils > /dev/null 2>&1) &
+      spinner $!
     else
       echo "$(date) - yum-utils package already installed." | tee -a $LOGFILE
     fi
@@ -45,12 +72,14 @@ read -p "(cd/internet): " CDORINTERNET
     echo "$(date)- Creating EMI from Eucalyptus installation CD." | tee -a $LOGFILE
     CDNOTMOUNTED=`ls /media/cdrom/repodata/repomd.xml > /dev/null 2>&1 ; echo $?`
     while [ $CDNOTMOUNTED -ne 0 ] ; do
+      echo ""
       read -p "Please insert your Eucalyptus installation CD and press ENTER: "
       sleep 5
       mkdir -p /media/cdrom
-      mount /dev/cdrom /media/cdrom
+      mount /dev/cdrom /media/cdrom > /dev/null 2>&1
       CDNOTMOUNTED=`ls /media/cdrom/repodata/repomd.xml > /dev/null 2>&1 ; echo $?`
       if [ $CDNOTMOUNTED -ne 0 ] ; then
+        echo ""
         echo "Unable to locate Eucalyptus installation CD.  Press Ctrl-C to abort."
         echo ""
       fi
@@ -63,6 +92,7 @@ read -p "(cd/internet): " CDORINTERNET
 done
 IMAGESIZE=""
 while ! echo "$IMAGESIZE" | grep -iE '(^small$|^medium$|^large$)' > /dev/null ; do
+  echo ""
   echo "The default instance type/disk sizes for EMIs are:"
   echo "small:   2 GB (1.5 GB root, 512 MB swap)"
   echo "medium:  5 GB (4.5 GB root, 512 MB swap)"
@@ -76,7 +106,13 @@ while ! echo "$IMAGESIZE" | grep -iE '(^small$|^medium$|^large$)' > /dev/null ; 
   echo "greater than the root filesystem + 512 MB swap is allocated as an 'ephemeral'"
   echo "storage partition."
   echo ""
-  read -p "Would you like a small, medium, or large root filesystem for this EMI? " IMAGESIZE
+  IMAGESIZE="small"
+  echo "Would you like a small, medium, or large root filesystem for this EMI?"
+  read -p "[$IMAGESIZE] " image_size
+  if [ $image_size ]
+  then
+    export IMAGESIZE=$image_size
+  fi
   case "$IMAGESIZE" in
   "small")
     SEEKBLOCKS=1533
@@ -93,13 +129,14 @@ while ! echo "$IMAGESIZE" | grep -iE '(^small$|^medium$|^large$)' > /dev/null ; 
   esac
 done
 echo "$(date)- Creating and mounting disk image file." | tee -a $LOGFILE
-dd if=/dev/zero of=centos-${ELVERSION}-x86_64-${IMAGESIZE}.img bs=1M count=1 seek=${SEEKBLOCKS}
+dd if=/dev/zero of=centos-${ELVERSION}-x86_64-${IMAGESIZE}.img bs=1M count=1 seek=${SEEKBLOCKS} >>$LOGFILE 2>&1
 parted centos-${ELVERSION}-x86_64-${IMAGESIZE}.img mklabel msdos
-mkfs.ext3 -F -L root centos-${ELVERSION}-x86_64-${IMAGESIZE}.img
+mkfs.ext3 -F -L root centos-${ELVERSION}-x86_64-${IMAGESIZE}.img >>$LOGFILE 2>&1
 losetup -f centos-${ELVERSION}-x86_64-${IMAGESIZE}.img
 IMAGELOOPDEVICE=`losetup -a | grep -E "centos-${ELVERSION}-x86_64-${IMAGESIZE}.img" | awk '{print $1}' | sed 's/://g'`
 mkdir -p /mnt/image
 mount ${IMAGELOOPDEVICE} /mnt/image
+echo "$(date)- Mounted disk image file." | tee -a $LOGFILE
 mkdir -p /mnt/image/{proc,etc,dev,var/{cache,log,lock}}
 MAKEDEV -d /mnt/image/dev -x console
 MAKEDEV -d /mnt/image/dev -x null
@@ -113,34 +150,51 @@ none          /dev/shm tmpfs  defaults       0 0
 none          /proc    proc   defaults       0 0
 none          /sys     sysfs  defaults       0 0
 EOF
-echo "$(date)- Installing packages in image." | tee -a $LOGFILE
 case "$CDORINTERNET" in
 Internet|internet)
   mkdir -p /mnt/image/var/lib/rpm
   rpm --initdb --dbpath /mnt/image/var/lib/rpm
-  yumdownloader centos-release epel-release euca2ools-release
-  rpm -ivh --nodeps --root /mnt/image *release*.rpm
+  echo "$(date)- Installing *-release packages in image." | tee -a $LOGFILE
+  (yumdownloader centos-release epel-release euca2ools-release >>$LOGFILE 2>&1) &
+  spinner $!
+  rpm -ivh --nodeps --root /mnt/image *release*.rpm >>$LOGFILE 2>&1
   rm -f *release*.rpm
   case "$ELVERSION" in
   "5")
-    yum -y --nogpgcheck --installroot=/mnt/image/ groupinstall 'Core'
-    yum -y --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl euca2ools euca2ools-release iptables iptables-ipv6 kernel-xen mdadm ntp openssh-clients parted selinux-policy unzip wget which zip
+    echo "$(date)- Installing Core group of packages in image.  This may take a few minutes." | tee -a $LOGFILE
+    (yum -y --nogpgcheck --installroot=/mnt/image/ groupinstall 'Core' >>$LOGFILE 2>&1) &
+    spinner $!
+    echo "$(date)- Installing other packages in image." | tee -a $LOGFILE
+    (yum -y --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl euca2ools euca2ools-release iptables iptables-ipv6 kernel-xen mdadm ntp openssh-clients parted selinux-policy unzip wget which zip >>$LOGFILE 2>&1) &
+    spinner $!
   ;;
   "6")
-    yum -y --nogpgcheck --installroot=/mnt/image/ groupinstall 'Core'
-    yum -y --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl euca2ools euca2ools-release iptables iptables-ipv6 kernel mdadm ntp openssh-clients parted selinux-policy unzip wget which zip
+    echo "$(date)- Installing Core group of packages in image.  This may take a few minutes." | tee -a $LOGFILE
+    (yum -y --nogpgcheck --installroot=/mnt/image/ groupinstall 'Core' >>$LOGFILE 2>&1) &
+    spinner $!
+    echo "$(date)- Installing other packages in image." | tee -a $LOGFILE
+    (yum -y --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl euca2ools euca2ools-release iptables iptables-ipv6 kernel mdadm ntp openssh-clients parted selinux-policy unzip wget which zip >>$LOGFILE 2>&1) &
+    spinner $!
   ;;
   esac
   ;;
 cd|CD)
   case "$ELVERSION" in
   "5")
-    yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ groupinstall 'Core'
-    yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl euca2ools euca2ools-release iptables iptables-ipv6 kernel-xen mdadm ntp openssh-clients parted selinux-policy unzip wget which zip
+    echo "$(date)- Installing Core group of packages in image.  This may take a few minutes." | tee -a $LOGFILE
+    (yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ groupinstall 'Core' >>$LOGFILE 2>&1) &
+    spinner $!
+    echo "$(date)- Installing other packages in image." | tee -a $LOGFILE
+    (yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl euca2ools euca2ools-release iptables iptables-ipv6 kernel-xen mdadm ntp openssh-clients parted selinux-policy unzip wget which zip >>$LOGFILE 2>&1) &
+    spinner $!
   ;;
   "6")
-    yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ groupinstall 'Core'
-    yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl euca2ools euca2ools-release iptables iptables-ipv6 kernel mdadm ntp openssh-clients parted selinux-policy unzip wget which zip
+    echo "$(date)- Installing Core group of packages in image.  This may take a few minutes." | tee -a $LOGFILE
+    (yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ groupinstall 'Core' >>$LOGFILE 2>&1) &
+    spinner $!
+    echo "$(date)- Installing other packages in image." | tee -a $LOGFILE
+    (yum -y --disablerepo=\* --enablerepo="c${ELVERSION}-media" --nogpgcheck --installroot=/mnt/image/ install authconfig bzip2 curl euca2ools euca2ools-release iptables iptables-ipv6 kernel mdadm ntp openssh-clients parted selinux-policy unzip wget which zip >>$LOGFILE 2>&1) &
+    spinner $!
   ;;
   esac
   echo "$(date)- Unmounting Eucalyptus installation CD." | tee -a $LOGFILE
@@ -235,7 +289,7 @@ exit 0
 EOF
 echo "$(date)- Generating and setting random root password." | tee -a $LOGFILE
 chroot /mnt/image authconfig --enableshadow --passalgo=sha512 --updateall
-dd if=/dev/urandom bs=1M count=1 2>/dev/null | sha512sum | awk '{print $1}' | chroot /mnt/image passwd --stdin root
+dd if=/dev/urandom bs=1M count=1 2>/dev/null | sha512sum | awk '{print $1}' | chroot /mnt/image passwd --stdin root > /dev/null 2>&1
 echo "$(date)- Disabling iptables in image." | tee -a $LOGFILE
 chroot /mnt/image chkconfig iptables off
 chroot /mnt/image chkconfig ip6tables off
@@ -243,9 +297,9 @@ case "$ELVERSION" in
 "5")
   echo "$(date)- Generating ramdisk and copying kernel from Node Controller." | tee -a $LOGFILE
   TEMPNODE=`euca_conf --list-nodes 2>/dev/null | grep NODE | awk '{print $2}' | head -n 1`
-  scp ${TEMPNODE}:/boot/vmlinuz*xen ./
+  scp ${TEMPNODE}:/boot/vmlinuz*xen ./ >>$LOGFILE 2>&1
   ssh ${TEMPNODE} 'mkinitrd --omit-scsi-modules --with=xennet --with=xenblk --preload=xenblk /tmp/initrd-$(uname -r).img $(uname -r)'
-  scp ${TEMPNODE}:/tmp/initrd-* ./
+  scp ${TEMPNODE}:/tmp/initrd-* ./ >>$LOGFILE 2>&1
   ssh ${TEMPNODE} "rm -f /tmp/initrd-*"
 ;;
 "6")
@@ -272,10 +326,10 @@ echo "$(date)- Bundling, uploading, and registering ramdisk image." | tee -a $LO
 INITRDMANIFEST=`euca-bundle-image -i $INITRDIMAGE --ramdisk true | grep 'Generating manifest' | awk '{print $3}'`
 INITRDUPLOADEDBUNDLE=`euca-upload-bundle -b $IMAGENAME -m $INITRDMANIFEST | grep 'Uploaded image as' | awk '{print $4}'`
 INITRDERI=`euca-register -n $INITRDIMAGE -a x86_64 --ramdisk true $INITRDUPLOADEDBUNDLE | awk '{print $2}'`
-echo "$(date)- Bundling, uploading and registering EMI." | tee -a $LOGFILE
+echo "$(date)- Bundling, uploading and registering EMI.  This may take a few minutes." | tee -a $LOGFILE
 EMIMANIFEST=`euca-bundle-image -i ${IMAGENAME}.img --kernel $KERNELEKI --ramdisk $INITRDERI | grep 'Generating manifest' | awk '{print $3}'`
 EMIUPLOADEDBUNDLE=`euca-upload-bundle -b $IMAGENAME -m $EMIMANIFEST | grep 'Uploaded image as' | awk '{print $4}'`
 EMI=`euca-register -n $IMAGENAME -a x86_64 --kernel $KERNELEKI --ramdisk $INITRDERI $EMIUPLOADEDBUNDLE  | awk '{print $2}'`
 echo "$(date)- EMI image $EMI is ready to use." | tee -a $LOGFILE
-rm -f ${IMAGENAME}.img $KERNELIMAGE $INITRDIMAGE
+rm -f ${IMAGENAME}.img $KERNELIMAGE $INITRDIMAGE /tmp/${IMAGENAME}.img* /tmp/${KERNELIMAGE}* /tmp/${INITRDIMAGE}*
 

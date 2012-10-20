@@ -124,13 +124,13 @@ case "$ELVERSION" in
   cd tmp-anaconda-updates
   mount -rw -t squashfs -o loop ${BUILDDIR}/image/images/install.img install/
   cp install/usr/lib/anaconda/kickstart.py updates/
-  umount install
   sed -i '/dispatch.skipStep.*network/d' updates/kickstart.py
   cd updates
-  find . | cpio -H newc -o > ../updates.img.tmp
+  find . | cpio -H newc -o > ../updates.img.tmp 2>/dev/null
   cd ..
   gzip updates.img.tmp
   mv updates.img.tmp.gz ${BUILDDIR}/image/images/updates.img
+  umount install
   cd ${BUILDDIR}
   rm -rf tmp-anaconda-updates
   echo "$(date) - Created updates.img"

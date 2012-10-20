@@ -57,7 +57,7 @@ fi
 
 # Error checking function
 function error_check {
-  count=`grep -i 'error\|fail\|exception' $LOGFILE|wc -l`
+  count=`grep -i 'error\|fail\|exception' $LOGFILE|grep -v 'libgpg-error'|wc -l`
   if [ $count -gt "0" ]
   then
     echo "An error occured in the last step, look at $LOGFILE for more details"
@@ -140,9 +140,14 @@ echo "If your systems have Internet access, and you would like to use NTP to"
 echo "synchronize their clocks with the default pool.ntp.org servers, please answer"
 echo "yes."
 echo ""
-while ! echo "$ENABLE_NTP_SYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
-  read -p "Would you like to enable NTP and synchronize clock? " ENABLE_NTP_SYNC
-  case "$ENABLE_NTP_SYNC" in
+while ! echo "$ENABLENTPSYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
+  ENABLENTPSYNC="Yes"
+  read -p "Would you like to enable NTP and synchronize clock? [$ENABLENTPSYNC] " enable_ntp_sync
+  if [ $enable_ntp_sync ] 
+  then
+    ENABLENTPSYNC=$enable_ntp_sync
+  fi
+  case "$ENABLENTPSYNC" in
   y|Y|yes|YES|Yes)
     echo "$(date)- Setting clock via NTP.  This may take a few minutes." | tee -a $LOGFILE
     if [ -f /var/run/ntpd.pid ] ; then
@@ -220,16 +225,16 @@ if [ $CIAB = "Y" ] ; then
   "###.###.###.###")
     echo "The configuration script was unable to determine suitable networks to suggest."
     echo ""
-    CHANGECIABNETWORKS="Y"
+    CHANGECIABNETWORKS="Yes"
     ;;
   *)
-    CHANGECIABNETWORKS="N"
+    CHANGECIABNETWORKS="No"
     echo "Local Bridge subnet: $CIABBRIDGESUBNET"
     echo "Local Bridge netmask: $CIABBRIDGENETMASK"
     echo "Eucalyptus VNET_SUBNET: $CIABVNETSUBNET"
     echo "Eucalyptus VNET_NETMASK: $CIABVNETNETMASK"
     echo ""
-    read -p "Would you like to change these virtual network addresses [$CHANGECIABNETWORKS]" change_ciab_networks
+    read -p "Would you like to change these virtual network addresses? [$CHANGECIABNETWORKS] " change_ciab_networks
     if [ $change_ciab_networks ]
     then
       export CHANGECIABNETWORKS=$change_ciab_networks
@@ -237,22 +242,22 @@ if [ $CIAB = "Y" ] ; then
     ;;
   esac
   while ! echo "$CHANGECIABNETWORKS" | grep -iE '(^n$|^no$)' > /dev/null ; do
-    read -p "Local Bridge Subnet [$CIABBRIDGESUBNET]" ciab_bridge_subnet
+    read -p "Local Bridge Subnet [$CIABBRIDGESUBNET] " ciab_bridge_subnet
     if [ $ciab_bridge_subnet ]
     then
       export CIABBRIDGESUBNET=$ciab_bridge_subnet
     fi
-    read -p "Local Bridge netmask [$CIABBRIDGENETMASK]" ciab_bridge_netmask
+    read -p "Local Bridge netmask [$CIABBRIDGENETMASK] " ciab_bridge_netmask
     if [ $ciab_bridge_netmask ]
     then
       export CIABBRIDGENETMASK=$ciab_bridge_netmask
     fi
-    read -p "Eucalyptus VNET_SUBNET [$CIABVNETSUBNET]" ciab_vnet_subnet
+    read -p "Eucalyptus VNET_SUBNET [$CIABVNETSUBNET] " ciab_vnet_subnet
     if [ $ciab_vnet_subnet ]
     then
       export CIABVNETSUBNET=$ciab_vnet_subnet
     fi
-    read -p "Eucalyptus VNET_NETMASK [$CIABVNETNETMASK]" ciab_vnet_netmask
+    read -p "Eucalyptus VNET_NETMASK [$CIABVNETNETMASK] " ciab_vnet_netmask
     if [ $ciab_vnet_netmask ]
     then
       export CIABVNETNETMASK=$ciab_vnet_netmask
@@ -263,7 +268,7 @@ if [ $CIAB = "Y" ] ; then
     echo "Eucalyptus VNET_SUBNET: $CIABVNETSUBNET"
     echo "Eucalyptus VNET_NETMASK: $CIABVNETNETMASK"
     echo ""
-    read -p "Would you like to change these virtual network addresses [$CHANGECIABNETWORKS]" change_ciab_networks
+    read -p "Would you like to change these virtual network addresses? [$CHANGECIABNETWORKS] " change_ciab_networks
     if [ $change_ciab_networks ]
     then
       export CHANGECIABNETWORKS=$change_ciab_networks
@@ -386,7 +391,7 @@ fi
 
 # populate the SSH known_hosts file
 for FEIP in `ip addr show |grep inet |grep global|awk -F"[\t /]*" '{ print $3 }'` ; do
-  ssh -o StrictHostKeyChecking=no $FEIP "true"
+  ssh -o StrictHostKeyChecking=no $FEIP "true" > /dev/null 2>&1
 done
 
 # Edit the default eucalyptus.conf, insert default values if no previous
@@ -420,6 +425,7 @@ fi
 # Gather information from the user, and perform eucalyptus.conf property edits
 echo ""
 echo "We need some network information"
+echo ""
 EUCACONFIG=/etc/eucalyptus/eucalyptus.conf
 if [ $CIAB = "N" ] ; then
   edit_prop VNET_MODE "Which Eucalyptus networking mode would you like to use? " $EUCACONFIG
@@ -541,7 +547,8 @@ fi
 # Initialize the CLC if there is no existing cloud-cert.pem
 if [ ! -f /var/lib/eucalyptus/keys/cloud-cert.pem ] ; then
   echo "$(date)- Initializing Cloud Controller " | tee -a $LOGFILE
-  /usr/sbin/euca_conf --initialize
+  (/usr/sbin/euca_conf --initialize) &
+  spinner $!
 fi
 
 # Start Eucalyptus services prior to registration
@@ -599,8 +606,9 @@ export PUBLIC_IP_ADDRESS=`ip addr show $PUBLIC_INTERFACE |grep inet |grep global
 export PRIVATE_IP_ADDRESS=`ip addr show $PRIVATE_INTERFACE |grep inet |grep global|awk -F"[\t /]*" '{ print $3 }'`
 # Prompt for ip confirm
 if [ $CIAB = "N" ] ; then
-  read -p "Public IP for Cloud Controller and Walrus [$PUBLIC_IP_ADDRESS]" public_ip
-  read -p "Private IP for Cluster Controller and Storage Controller [$PRIVATE_IP_ADDRESS]" private_ip
+  echo ""
+  read -p "Public IP for Cloud Controller and Walrus [$PUBLIC_IP_ADDRESS] " public_ip
+  read -p "Private IP for Cluster Controller and Storage Controller [$PRIVATE_IP_ADDRESS] " private_ip
   if [ $public_ip ]
   then
     export PUBLIC_IP_ADDRESS=$public_ip
@@ -610,25 +618,27 @@ if [ $CIAB = "N" ] ; then
     export PRIVATE_IP_ADDRESS=$private_ip
   fi
 fi
+echo ""
 echo "Using public IP $PUBLIC_IP_ADDRESS and private IP $PRIVATE_IP_ADDRESS to" | tee -a $LOGFILE
 echo "register components" | tee -a $LOGFILE
 
 # Register Walrus
 if [ `/usr/sbin/euca_conf --list-walruses 2>/dev/null |wc -l` -eq 0 ]
 then
-  /usr/sbin/euca_conf --register-walrus --partition walrus --host $PUBLIC_IP_ADDRESS --component=walrus | tee -a $LOGFILE 
+  /usr/sbin/euca_conf --register-walrus --partition walrus --host $PUBLIC_IP_ADDRESS --component=walrus >>$LOGFILE 2>&1 
+  echo "$(date)- Registered Walrus at $PUBLIC_IP_ADDRESS" | tee -a $LOGFILE
 else
-  echo "Walrus already registered. Will not re-register walrus" | tee -a $LOGFILE
+  echo "$(date)- Walrus already registered. Will not re-register walrus" | tee -a $LOGFILE
 fi
 
 # Deregister previous SCs and clusters
-for OLDSCIP in `/usr/sbin/euca_conf --list-scs|awk '{print $4}'`
+for OLDSCIP in `/usr/sbin/euca_conf --list-scs 2>/dev/null|awk '{print $4}'`
 do
   OLDSCPARTITION=`/usr/sbin/euca_conf --list-scs|awk '{print $2}'`
   OLDSCCOMPONENT=`/usr/sbin/euca_conf --list-scs|awk '{print $3}'`
   /usr/sbin/euca_conf --deregister-sc --partition ${OLDSCPARTITION} --host ${OLDSCIP} --component=${OLDSCCOMPONENT} >>$LOGFILE 2>&1
 done
-for OLDCCIP in `/usr/sbin/euca_conf --list-clusters|awk '{print $4}'`
+for OLDCCIP in `/usr/sbin/euca_conf --list-clusters 2>/dev/null|awk '{print $4}'`
 do
   OLDCCPARTITION=`/usr/sbin/euca_conf --list-clusters|awk '{print $2}'`
   OLDCCCOMPONENT=`/usr/sbin/euca_conf --list-clusters|awk '{print $3}'`
@@ -636,8 +646,10 @@ do
 done
 
 # Now register clusters and SCs
-/usr/sbin/euca_conf --register-cluster --partition $CLUSTER_NAME --host $PUBLIC_IP_ADDRESS --component=cc_01 | tee -a $LOGFILE
-/usr/sbin/euca_conf --register-sc --partition $CLUSTER_NAME --host $PRIVATE_IP_ADDRESS --component=sc_01 | tee -a $LOGFILE
+/usr/sbin/euca_conf --register-cluster --partition $CLUSTER_NAME --host $PUBLIC_IP_ADDRESS --component=cc_01 >>$LOGFILE 2>&1
+echo "$(date)- Registered Cluster Controller at $PUBLIC_IP_ADDRESS" | tee -a $LOGFILE
+/usr/sbin/euca_conf --register-sc --partition $CLUSTER_NAME --host $PRIVATE_IP_ADDRESS --component=sc_01 >>$LOGFILE 2>&1
+echo "$(date)- Registered Storage Controller at $PRIVATE_IP_ADDRESS" | tee -a $LOGFILE
 error_check
 
 # Deregister previous node controllers
@@ -654,7 +666,9 @@ if [ $CIAB = "N" ] ; then
   done="not"
   while [ $done != "done" ]
   do
+    echo ""
     read -p "Node IP (ENTER when done): " node
+    echo ""
     if [ ! $node ]
     then
       done="done"
@@ -662,16 +676,19 @@ if [ $CIAB = "N" ] ; then
       echo '/usr/sbin/euca_conf --register-nodes "host host ..."'
     else
       echo "Please enter the root password of the node controller when prompted"
-      ssh-copy-id -i /root/.ssh/id_rsa.pub root@${node}
-      ssh root@${node} "service eucalyptus-nc restart"
-      /usr/sbin/euca_conf --register-nodes $node | tee -a $LOGFILE
+      echo ""
+      cat /root/.ssh/id_rsa.pub | ssh ${node} "umask 077; test -d .ssh || mkdir .ssh ; cat >> .ssh/authorized_keys; test -x /sbin/restorecon && /sbin/restorecon .ssh .ssh/authorized_keys" || exit 1
+      /usr/sbin/euca_conf --register-nodes $node >>$LOGFILE 2>&1
+      echo "$(date)- Registered Node Controller at $node" | tee -a $LOGFILE
     fi
   done
 else
-  /usr/sbin/euca_conf --register-nodes $CIABBRIDGEIP | tee -a $LOGFILE
+  /usr/sbin/euca_conf --register-nodes $CIABBRIDGEIP >>$LOGFILE 2>&1
+  echo "$(date)- Registered Node Controller at $CIABBRIDGEIP" | tee -a $LOGFILE
 fi
 error_check
-echo "$(date)- Registered components " | tee -a $LOGFILE
+echo ""
+echo "$(date)- Registered components" | tee -a $LOGFILE
 echo ""
 }
 
@@ -680,14 +697,16 @@ function get_credentials {
   if [ ! -f /root/credentials/admin/eucarc ] ; then
     mkdir -p /root/credentials/admin | tee -a $LOGFILE
     cd /root/credentials/admin
-    euca_conf --get-credentials admin.zip | tee -a $LOGFILE
-    unzip admin.zip | tee -a $LOGFILE
+    euca_conf --get-credentials admin.zip >>$LOGFILE 2>&1
+    unzip admin.zip >>$LOGFILE 2>&1
     source eucarc
     euca-add-keypair admin > admin.private
     cd /root
     ln -s /root/credentials/admin/eucarc .eucarc
     chmod -R go-rwx credentials | tee -a $LOGFILE
     chmod go-rwx .eucarc | tee -a $LOGFILE
+    echo "$(date)- Downloaded cloud admin credentials to /root/credentials/admin" | tee -a $LOGFILE
+    echo ""
   fi
 }
 
@@ -697,18 +716,22 @@ function install_desktop {
   echo ""
   case "$ELVERSION" in
   "5")
-    yum -y groupinstall 'GNOME Desktop Environment' 'X Window System'
+    (yum -y groupinstall 'GNOME Desktop Environment' 'X Window System' >> $LOGFILE 2>&1) &
+    spinner $!
     ;;
   "6")
-    yum -y groupinstall 'X Window System' 'Desktop' 'Fonts'
+    (yum -y groupinstall 'X Window System' 'Desktop' 'Fonts' >> $LOGFILE 2>&1) &
+    spinner $!
     ;;
   esac
-  yum -y install firefox
+  (yum -y install firefox >> $LOGFILE 2>&1) &
+  spinner $!
   sed --in-place 's/id:3:initdefault:/id:5:initdefault:/g' /etc/inittab
   chkconfig NetworkManager off
   sed -i -e 's/NM_CONTROLLED=yes/NM_CONTROLLED=no/' /etc/sysconfig/network-scripts/ifcfg-*
-  error_check
+  echo ""
   echo "$(date)- Graphical desktop installed." | tee -a $LOGFILE
+  echo ""
 }
 
 # Function to create users
@@ -796,10 +819,19 @@ get_credentials
 # Ask the user if they would like to create an EMI from the installation CD
 CREATEEMI=""
 ANTEXT="an"
-while ! echo "$CREATEEMI" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
 echo "Virtual machine images (EMIs) are required to run instances in your cloud."
-echo ""
-read -p "Would you like to create $ANTEXT EMI now? (y|n)" CREATEEMI
+while ! echo "$CREATEEMI" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
+  echo ""
+  if [ $ANTEXT = "an" ] ; then
+    CREATEEMI="Yes"
+  else
+    CREATEEMI="No"
+  fi
+  read -p "Would you like to create $ANTEXT EMI now? [$CREATEEMI] " create_emi
+  if [ $create_emi ]
+  then
+    export CREATEEMI=$create_emi
+  fi
   case "$CREATEEMI" in
   y|Y|yes|YES|Yes)
     eucalyptus-create-emi.sh
@@ -809,7 +841,10 @@ read -p "Would you like to create $ANTEXT EMI now? (y|n)" CREATEEMI
     echo ""
     ;;
   n|N|no|NO|No)
-    echo "$(date)- Skipped EMI creation." | tee -a $LOGFILE
+    if [ $ANTEXT = "an" ] ; then
+      echo "$(date)- Skipped EMI creation." | tee -a $LOGFILE
+    fi
+    echo ""
     ;;
   *)
     echo "Please answer either 'yes' or 'no'."
@@ -820,19 +855,26 @@ done
 # Ask the user if they would like to install a graphical desktop on the Frontend server
 INSTALLDESKTOP=""
 while ! echo "$INSTALLDESKTOP" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
-echo "If you have Internet access, you can optionally install a graphical desktop,"
-echo "which will allow you to test web access to your new cloud from this system."
-echo ""
-echo "This will download approximately 300 MB of packages, which may take a long time,"
-echo "depending on the speed of your Internet connection."
-echo ""
-read -p "Would you like to install a graphical desktop on this server? " INSTALLDESKTOP
+  echo "If you have Internet access, you can optionally install a graphical desktop,"
+  echo "which will allow you to test web access to your new cloud from this system."
+  echo ""
+  echo "This will download approximately 300 MB of packages, which may take a long time,"
+  echo "depending on the speed of your Internet connection."
+  echo ""
+  INSTALLDESKTOP="No"
+  read -p "Would you like to install a graphical desktop on this server? [$INSTALLDESKTOP] " install_graphical_desktop
+  if [ $install_graphical_desktop ]
+  then
+    export INSTALLDESKTOP=$install_graphical_desktop
+  fi
+  echo ""
   case "$INSTALLDESKTOP" in
   y|Y|yes|YES|Yes)
     install_desktop
     ;;
   n|N|no|NO|No)
     echo "$(date)- Skipped graphical desktop installation." | tee -a $LOGFILE
+    echo ""
     ;;
   *)
     echo "Please answer either 'yes' or 'no'."
@@ -844,13 +886,19 @@ done
 rpm -q gdm > /dev/null
 if [ $? -eq 0 ] ; then
   echo "In order to log in to the graphical desktop you must use a non-root user."
+  echo ""
   CREATEUSER=""
   while ! echo "$CREATEUSER" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
     HIGHESTUID=`cut -d: -f3 /etc/passwd | sort -n | grep -v 65534 | tail -n 1`
     if [ $HIGHESTUID -lt 500 ] ; then
-      CREATEUSER="yes"
+      CREATEUSER="Yes"
     else
-      read -p "Would you like to create another user? " CREATEUSER
+      CREATEUSER="No"
+      read -p "Would you like to create another user? [$CREATEUSER] " create_user
+      if [ $create_user ]
+      then
+        export CREATEUSER=$create_user
+      fi
     fi
     case "$CREATEUSER" in
     y|Y|yes|YES|Yes)
@@ -858,6 +906,7 @@ if [ $? -eq 0 ] ; then
       ;;
     n|N|no|NO|No)
       echo "$(date)- Skipped user creation." | tee -a $LOGFILE
+      echo ""
       ;;
     *)
       echo "Please answer either 'yes' or 'no'."

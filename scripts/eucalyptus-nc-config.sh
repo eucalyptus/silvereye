@@ -128,9 +128,14 @@ echo "If your systems have Internet access, and you would like to use NTP to"
 echo "synchronize their clocks with the default pool.ntp.org servers, please answer"
 echo "yes."
 echo ""
-while ! echo "$ENABLE_NTP_SYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
-  read -p "Enable NTP and synchronize clock? " ENABLE_NTP_SYNC
-  case "$ENABLE_NTP_SYNC" in
+while ! echo "$ENABLENTPSYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
+  ENABLENTPSYNC="Yes"
+  read -p "Enable NTP and synchronize clock? [$ENABLENTPSYNC]" enable_ntp_sync
+  if [ $enable_ntp_sync ]
+  then
+    ENABLENTPSYNC=$enable_ntp_sync
+  fi
+  case "$ENABLENTPSYNC" in
   y|Y|yes|YES|Yes)
     echo "$(date)- Setting clock via NTP.  This may take a few minutes." | tee -a $LOGFILE
     if [ -f /var/run/ntpd.pid ] ; then
@@ -143,12 +148,15 @@ while ! echo "$ENABLE_NTP_SYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; 
     service ntpd start >>$LOGFILE 2>&1
     error_check
     echo "$(date)- Set clock and enabled ntp" | tee -a $LOGFILE
+    echo ""
     ;;
   n|N|no|NO|No)
     echo "$(date)- Skipped NTP configuration and syncrhonization." | tee -a $LOGFILE
+    echo ""
     ;;
   *)
     echo "Please answer either 'yes' or 'no'."
+    echo ""
     ;;
   esac
 done
@@ -169,8 +177,8 @@ sed -i -e "s/.*HYPERVISOR=\".*\"/HYPERVISOR=\"$NC_HYPERVISOR\"/" /etc/eucalyptus
 sed --in-place 's/^VNET_MODE="SYSTEM"/#VNET_MODE="SYSTEM"/' /etc/eucalyptus/eucalyptus.conf >>$LOGFILE 2>&1
 
 # Gather information from the user, and perform eucalyptus.conf property edits
-echo ""
 echo "We need some network information"
+echo ""
 EUCACONFIG=/etc/eucalyptus/eucalyptus.conf
 edit_prop VNET_MODE "Which Eucalyptus networking mode would you like to use? " $EUCACONFIG
 edit_prop VNET_PUBINTERFACE "The NC public ethernet interface (connected to Frontend private network)" $EUCACONFIG
@@ -297,13 +305,15 @@ error_check
 /sbin/chkconfig eucalyptus-nc on >>$LOGFILE 2>&1
 error_check
 
+echo ""
 echo "This machine is ready and running as a Node Controller."
+echo ""
 echo "You can re-run this configuration script later by executing"
 echo "/usr/local/sbin/eucalyptus-nc-config.sh as root."
 echo ""
 echo "After all Node Controllers are installed and configured, install and configure"
 echo "your Frontend server."
-
+echo ""
 if [ $ELVERSION -eq 5 ] ; then
   echo "Your system needs to reboot to complete configuration changes."
   read -p "Press [Enter] key to reboot..."
