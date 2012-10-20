@@ -76,6 +76,17 @@ def get_distro_and_version():
   m = re.match('(.*) release ([0-9]+).*', releasedata)
   return m.groups()
 
+def chunked_download(url, dest):
+  req = urllib2.urlopen(url)
+  CHUNK = 16 * 1024
+  fp = open(dest, 'wb')
+  while True:
+    chunk = req.read(CHUNK)
+    if not chunk: break
+    fp.write(chunk)
+  fp.close()
+
+
 parser = argparse.ArgumentParser(description='Silvereye ISO builder')
 parser.add_argument('--eucaversion', default='3.1',
                     help='The version of eucalyptus to include')
@@ -251,7 +262,8 @@ class SilvereyeBuilder(yum.YumBase):
       # we should probably compare timestamps here
       if not os.path.exists(os.path.join(self.builddir, 'image', x)):
         self.logger.info("Downloading " + downloadUrl + x)
-        open(os.path.join(self.builddir, 'image', x), 'w').write(urllib2.urlopen(downloadUrl + x).read())
+        chunked_download(downloadUrl + x,
+                         os.path.join(self.builddir, 'image', x))
 
   def getImageFiles(self):
     repo = self.repos.getRepo('base')
@@ -284,13 +296,14 @@ class SilvereyeBuilder(yum.YumBase):
       # we should probably compare timestamps here
       if not os.path.exists(os.path.join(self.builddir, 'image', 'images', x)):
         self.logger.info("Downloading " + downloadUrl + 'images/' + x)
-        open(os.path.join(self.builddir, 'image', 'images', x), 'w').write(urllib2.urlopen(downloadUrl + 'images/' + x).read())
-
+        chunked_download(downloadUrl + 'images/' + x,
+                         os.path.join(self.builddir, 'image', 'images', x))
   def makeUpdatesImg(self):
     sudo = []
     # Fix anaconda bugs to allow copying files from CD during %post
     # scripts in EL5, and network prompting in EL6
-    mkdir('updates')
+    updatesdir = os.path.join(self.builddir, 'updates')
+    mkdir(updatesdir)
     updatesimg = os.path.join(self.builddir, 'image', 'images', 'updates.img')
 
     if self.distroversion == "5":
@@ -301,8 +314,8 @@ class SilvereyeBuilder(yum.YumBase):
       subprocess.call(["dd", "if=/dev/zero", "of=" + updatesimg,
                        "bs=1K", "count=1", "seek=127"])
       subprocess.call(["/sbin/mkfs.ext2", "-F", "-L", "updates", updatesimg])
-      subprocess.call(sudo + [ "/bin/mount", "-o", "loop", updatesimg, "updates" ])
-      subprocess.call([ "chmod", "777", "updates" ])
+      subprocess.call(sudo + [ "/bin/mount", "-o", "loop", updatesimg, updatesdir ])
+      subprocess.call([ "chmod", "777", updatesdir ])
       f = open('/usr/lib/anaconda/dispatch.py', 'r')
       g = open('updates/dispatch.py', 'w')
       for line in f.readlines():
@@ -315,10 +328,10 @@ class SilvereyeBuilder(yum.YumBase):
                                '("dopostaction", doPostAction, )'))
       f.close()
       g.close()
-      subprocess.call(sudo + ['/bin/umount', 'updates'])
+      subprocess.call(sudo + ['/bin/umount', updatesdir ])
     elif self.distroversion == "6":
       f = open('/usr/lib/anaconda/kickstart.py', 'r')
-      g = open('updates/kickstart.py', 'w')
+      g = open(os.path.join(updatesdir, 'kickstart.py'), 'w')
       for line in f.readlines():
         if re.match('.*dispatch.skipStep.*network.*', line):
           continue
@@ -326,9 +339,10 @@ class SilvereyeBuilder(yum.YumBase):
       f.close()
       g.close()
       p = subprocess.Popen(['cpio', '-H', 'newc', '-o'],
-                       stdin=StringIO("kickstart.py"),
+                       cwd=os.path.abspath(updatesdir),
+                       stdin=subprocess.PIPE,
                        stdout=gzip.open(updatesimg, 'w'))
-      p.wait()
+      p.communicate(input='kickstart.py')
 
   def createKickstartFiles(self):
     # Create kickstart files
@@ -403,7 +417,14 @@ class SilvereyeBuilder(yum.YumBase):
 
   def downloadPackages(self):
     # Retrieve the RPMs for CentOS, Eucalyptus, and dependencies
-    coregroup = [ x for x in self.doGroupLists()[0] if x.name == "Core" ][0]
+    coregroup = None
+    for groupList in self.doGroupLists():
+      for x in groupList:
+        if x.name == "Core":
+          coregroup = x
+          break
+      if coregroup: break
+
     rpms = set(coregroup.packages)
     rpms.update(['centos-release', 'epel-release', 'euca2ools-release',
                  'authconfig', 'fuse-libs', 'gpm', 'libsysfs', 'mdadm',
@@ -482,12 +503,12 @@ class SilvereyeBuilder(yum.YumBase):
     javarpm = [ x for x in os.listdir(self.pkgdir) if x.startswith('eucalyptus-common-java-3') ][0]
 
     # XXX hacky - switch to pipes?
-    cpiofd, cpiofn = mkstemp()
-    cpiofh = os.fdopen(cpiofd, "w")
-    rpmfile = open(os.path.join(self.pkgdir, javarpm), 'r')
-    yum.rpmUtils.miscutils.rpm2cpio(rpmfile.fileno(), out=cpiofh)
-    cpiofh.close()
-    subprocess.call(['cpio', '-idm', './var/lib/eucalyptus/webapps/root.war' ], stdin=open(cpiofn, 'r'), cwd=tmplogo)
+    rpmfile = os.path.join(self.pkgdir, javarpm)
+    p1 = subprocess.Popen(["rpm2cpio", rpmfile ], stdout=subprocess.PIPE)
+    p2 = subprocess.Popen(['cpio', '-idm', './var/lib/eucalyptus/webapps/root.war' ], 
+                          stdin=p1.stdout, cwd=tmplogo)
+    p1.stdout.close()
+    p2.wait()
     subprocess.call(['unzip', './var/lib/eucalyptus/webapps/root.war'], cwd=tmplogo)
 
     # It would be nice to do all of the ImageMagick stuff with PIL, but I don't know how.
