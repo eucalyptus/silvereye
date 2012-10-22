@@ -607,8 +607,8 @@ export PRIVATE_IP_ADDRESS=`ip addr show $PRIVATE_INTERFACE |grep inet |grep glob
 # Prompt for ip confirm
 if [ $CIAB = "N" ] ; then
   echo ""
-  read -p "Public IP for Cloud Controller and Walrus [$PUBLIC_IP_ADDRESS] " public_ip
-  read -p "Private IP for Cluster Controller and Storage Controller [$PRIVATE_IP_ADDRESS] " private_ip
+  read -p "Public IP for Cloud Controller, Walrus, and Cluster Controller [$PUBLIC_IP_ADDRESS] " public_ip
+  read -p "Private IP for Storage Controller [$PRIVATE_IP_ADDRESS] " private_ip
   if [ $public_ip ]
   then
     export PUBLIC_IP_ADDRESS=$public_ip
