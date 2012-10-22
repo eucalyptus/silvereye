@@ -34,7 +34,6 @@ import os
 import re
 import shutil
 import subprocess
-from StringIO import StringIO
 import sys
 from tempfile import mkstemp, mkdtemp
 import time
@@ -89,40 +88,92 @@ def chunked_download(url, dest):
   fp.close()
 
 
-parser = argparse.ArgumentParser(description='Silvereye ISO builder')
-parser.add_argument('--eucaversion', default='3.1',
-                    help='The version of eucalyptus to include')
-parser.add_argument('--builddir', default=None,
-                    help='The build directory')
-parser.add_argument('--verbose', action="store_true",
-                    help='Enable verbose logging')
-parser.add_argument('--isofile', default=None,
-                    help='The name of the output ISO file')
-parser.add_argument('--debug', action="store_true",
-                    help='Enable tracebacks on exceptions')
-parser.add_argument('--debugger', action="store_true",
-                    help='Enable debugger on exceptions')
-parser.add_argument('--distroname', 
-                    help='(EXPERIMENTAL) The Linux distribution name (usually CentOS)')
-parser.add_argument('--distroversion', 
-                    help='(EXPERIMENTAL) The version of $DISTRONAME to use')
-parser.add_argument('--noclean', action="store_true",
-                    help='Reuse contents in builddir')
-parser.add_argument('--cachedir',
-                    help='The yum cache directory')
-parser.add_argument('--updatesurl', 
-                    help='Fetch an updates img via url (CD will boot in debug mode)')
-parser.add_argument('--quiet', action="store_true",
-                    help='Suppress non-log output')
+class SilvereyeCLI():
+  def __init__(self):
+    parser = argparse.ArgumentParser(description='Silvereye ISO builder')
+    parser.add_argument('--eucaversion', default='3.1',
+                        help='The version of eucalyptus to include')
+    parser.add_argument('--builddir', default=None,
+                        help='The build directory')
+    parser.add_argument('--verbose', action="store_true",
+                        help='Enable verbose logging')
+    parser.add_argument('--isofile', default=None,
+                        help='The name of the output ISO file')
+    parser.add_argument('--debug', action="store_true",
+                        help='Enable tracebacks on exceptions')
+    parser.add_argument('--debugger', action="store_true",
+                        help='Enable debugger on exceptions')
+    parser.add_argument('--distroname', 
+                        help='(EXPERIMENTAL) The Linux distribution name (usually CentOS)')
+    parser.add_argument('--distroversion', 
+                        help='(EXPERIMENTAL) The version of $DISTRONAME to use')
+    parser.add_argument('--noclean', action="store_true",
+                        help='Reuse contents in builddir')
+    parser.add_argument('--cachedir',
+                        help='The yum cache directory')
+    parser.add_argument('--updatesurl', 
+                        help='Fetch an updates img via url (CD will boot in debug mode)')
+    parser.add_argument('--quiet', action="store_true",
+                        help='Suppress non-log output')
+    parser.add_argument('--epel-repo',
+                        help='Set the base URL for your EPEL yum repository')
+    parser.add_argument('--centos-repo',
+                        help='Set the base URL for your CentOS yum repository')
+    parser.add_argument('--eucalyptus-repo',
+                        help='Set the base URL for your Eucalyptus repository')
+    parser.add_argument('--euca2ools-repo',
+                        help='Set the base URL for your Euca2ools repository')
+    self.parser = parser
 
+  def run(self):
+    kwargs = dict()
+    parsedargs = self.parser.parse_args()
+    sys.excepthook = gen_except_hook(parsedargs.debugger, parsedargs.debug)
+    for attr in [ 'builddir', 'distroname', 'distroversion',
+                  'eucaversion', 'isofile', 'updatesurl',
+                  'cachedir', 'verbose', 'quiet', 'noclean',
+                ]:
+      value = getattr(parsedargs, attr)
+      if value is not None:
+        kwargs[attr] = value
+
+    repoMap = dict()
+    for attr in [ 'centos_repo', 'epel_repo', 'eucalyptus_repo',
+                  'euca2ools_repo'
+                ]:
+      value = getattr(parsedargs, attr)
+      if value is not None:
+        repoMap[attr.split('_')[0]] = value
+
+    builder = SilvereyeBuilder(**kwargs) 
+    builder.distroCheck()
+    builder.installBuildDeps()
+    builder.getIsolinuxFiles()
+    builder.getImageFiles()
+    builder.makeUpdatesImg()
+    builder.createKickstartFiles()
+    builder.copyConfigScripts()
+    builder.setupRequiredRepos(repoMap=repoMap)
+    builder.downloadPackages()
+    builder.createRepo()
+    builder.createBootLogo()
+    builder.createBootMenu()
+    builder.createISO()
+    
 class SilvereyeBuilder(yum.YumBase):
-  def __init__(self, basedir, **kwargs):
+  def __init__(self, *args, **kwargs):
     """
     NOTE: Valid kwargs are builddir, distroname, distroversion,
           isofile, and eucaversion
     """
     yum.YumBase.__init__(self)
-    self.basedir = basedir
+
+    # This is the directory for the silvereye source file tree
+    self.basedir=kwargs.get('basedir', os.path.dirname(sys.argv[0]))
+    if not self.basedir:
+      self.basedir=os.getcwd()
+    else:
+      self.basedir=os.path.abspath(self.basedir)
 
     self.datestamp = str(time.time())
 
@@ -131,43 +182,33 @@ class SilvereyeBuilder(yum.YumBase):
     hostdistroname, hostdistroversion = get_distro_and_version()
     self.distroname = kwargs.get('distroname', hostdistroname)
     self.distroversion = kwargs.get('distroversion', hostdistroversion)
-    self.updatesurl = None
+    self.updatesurl = kwargs.get('updatesurl', None)
+
     self.cmdout = None
+    if kwargs.get('quiet', False):
+      self.cmdout = open('/dev/null', 'w')
+
     self.builddir = kwargs.get('builddir',
                                 os.path.join(os.getcwd(), 
                                              'silvereye_build.' + self.datestamp))
-
-    self.isofile = kwargs.get('isofile', 
-                              os.path.join(self.builddir, 
-                                           "silvereye.%s.iso" % self.datestamp))
-    # Define the logger, but it must be set up after final configuration
-    self.logger = logging.getLogger('silvereye')
-
-  def configure(self, parsedargs):
-    for attr in [ 'builddir', 'distroname', 'distroversion',
-                  'eucaversion', 'isofile', 'updatesurl' ]:
-      value = getattr(parsedargs, attr)
-      if value is not None:
-        setattr(self, attr, value)
-    
-    if os.path.exists(self.builddir) and parsedargs.noclean != True:
+    if os.path.exists(self.builddir) and kwargs.get('noclean', False) != True:
       shutil.rmtree(os.path.abspath(self.builddir))
     mkdir(self.builddir)
     self.builddir = os.path.abspath(self.builddir)
 
-    if parsedargs.verbose:
-      self.logger.setLevel(logging.DEBUG)
+    # Define the logger, but it must be set up after final configuration
+    self.logger = logging.getLogger('silvereye')
+    self.setupLogging(kwargs.get('verbose', False))
 
-    tmpdir = '/var/tmp'
-    if parsedargs.cachedir:
-      tmpdir = os.path.abspath(parsedargs.cachedir)
-      mkdir(tmpdir)
+    self.isofile = kwargs.get('isofile', 
+                              os.path.join(self.builddir, 
+                                           "silvereye.%s.iso" % self.datestamp))
+
+    tmpdir = os.path.abspath(kwargs.get('cachedir', '/var/tmp'))
+    mkdir(tmpdir)
     self.setCacheDir(tmpdir=tmpdir)
     # This is for yumdownloader calls
     os.environ['TMPDIR'] = tmpdir
-
-    if parsedargs.quiet:
-      self.cmdout = open('/dev/null', 'w')
 
   @property 
   def pkgdir(self):
@@ -188,27 +229,13 @@ class SilvereyeBuilder(yum.YumBase):
     else:
       self.logger.setLevel(logging.INFO)
 
-  def doBuild(self):
+  def distroCheck(self):
     if self.distroversion in [ "5", "6" ]:
       self.logger.info("Building installation CD image for %s release %s with Eucalyptus %s." % \
                 (self.distroname, self.distroversion, self.eucaversion))
     else:
       self.logger.error("This script must be run on CentOS version 5 or 6")
       sys.exit(2)
-
-    # TODO: Make this optional, maybe?
-    self.installBuildDeps()
-    self.getIsolinuxFiles()
-    self.getImageFiles()
-    self.makeUpdatesImg()
-    self.createKickstartFiles()
-    self.copyConfigScripts()
-    self.setupRequiredRepos()
-    self.downloadPackages()
-    self.createRepo()
-    self.createBootLogo()
-    self.createBootMenu()
-    self.createISO()
 
   def installBuildDeps(self):
     # Install silvereye dependencies
@@ -256,6 +283,7 @@ class SilvereyeBuilder(yum.YumBase):
     self.logger.info("Using %s for downloads" % downloadUrl)
 
     # write merged comps
+    self.comps.add(os.path.join(self.basedir, 'comps.xml'))
     open(os.path.join(self.builddir, 'comps.xml'), 'w').write(self.comps.xml())
 
     fileset = set(['.discinfo',
@@ -362,7 +390,7 @@ class SilvereyeBuilder(yum.YumBase):
     elif self.distroversion == "6":
       if os.path.exists(updatesdir):
         shutil.rmtree(updatesdir)
-      shutil.copytree(os.path.join(basedir, 'anaconda-updates', self.distroversion), updatesdir)
+      shutil.copytree(os.path.join(self.basedir, 'anaconda-updates', self.distroversion), updatesdir)
       f = open('/usr/lib/anaconda/kickstart.py', 'r')
       g = open(os.path.join(updatesdir, 'kickstart.py'), 'w')
       for line in f.readlines():
@@ -409,7 +437,7 @@ class SilvereyeBuilder(yum.YumBase):
                       os.path.join(self.imgdir, 'scripts', script))
 
   # Configure yum repositories
-  def setupRepo(self, pkgname, repoid, ignoreHostCfg=False, mirrorlist=None, baseurl=None):
+  def setupRepo(self, repoid, pkgname=None, ignoreHostCfg=False, mirrorlist=None, baseurl=None):
     if ignoreHostCfg and self.repos.repos.has_key(repoid):
       self.repos.delete(repoid)
 
@@ -425,32 +453,55 @@ class SilvereyeBuilder(yum.YumBase):
         newrepo.baseurl = baseurl
       self.repos.add(newrepo)
 
-  def setupRequiredRepos(self):
+  def setupRequiredRepos(self, repoMap={}):
     # Install/configure EPEL repository
-    self.setupRepo('epel-release', 'epel', 
+    if repoMap.has_key('epel'):
+      self.setupRepo('epel', baseurl='%s/%s/%s/' % (repoMap['epel'], self.distroversion, self.conf.yumvar['basearch']),
+                     ignoreHostCfg=True)
+    else:
+      self.setupRepo('epel', 'epel-release',
                    mirrorlist="http://mirrors.fedoraproject.org/mirrorlist?repo=epel-%s&arch=%s" % 
                    (self.distroversion, self.conf.yumvar['basearch']))
 
     # Install/configure ELRepo repository
-    self.setupRepo('elrepo-release', 'elrepo', 
+    if repoMap.has_key('elrepo'):
+      self.setupRepo('elrepo', 
+                     baseurl='%s/%s/%s/' % (repoMap['epel'],
+                                            self.distroversion,
+                                            self.conf.yumvar['basearch']),
+                     ignoreHostCfg=True)
+    self.setupRepo('elrepo', 'elrepo-release',
                    mirrorlist="http://elrepo.org/mirrors-elrepo.el%s" % self.distroversion)
 
     # Install/configure Eucalyptus repository
     # TODO:  Make sure the yum configuration pulls packages that match the requested release?
     # We should disable repos that might interfere with downloading the correct packages
-    if self.eucaversion == "nightly":
-      self.setupRepo('eucalyptus-release', 'eucalyptus', 
+    if repoMap.has_key('eucalyptus'): 
+      self.setupRepo('eucalyptus',
+                     baseurl='%s/%s/%s/' % (repoMap['eucalyptus'],
+                                            self.distroversion,
+                                            self.conf.yumvar['basearch']),
+                     ignoreHostConf=True)
+    elif self.eucaversion == "nightly":
+      self.setupRepo('eucalyptus', 'eucalyptus-release',
                      ignoreHostCfg=True,
                      baseurl="http://downloads.eucalyptus.com/software/eucalyptus/nightly/3.2/centos/%s/%s/" % 
                      (self.distroversion, self.conf.yumvar['basearch']))
     else:
-      self.setupRepo('eucalyptus-release', 'eucalyptus',
+      self.setupRepo('eucalyptus', 'eucalyptus-release',
                      ignoreHostCfg=True,
                      baseurl="http://downloads.eucalyptus.com/software/eucalyptus/%s/centos/%s/%s/" % 
                      (self.eucaversion, self.distroversion, self.conf.yumvar['basearch']))
 
     # Install euca2ools repository
-    self.setupRepo('euca2ools-release', 'euca2ools', 
+    if repoMap.has_key('euca2ools'):
+      self.setupRepo('euca2ools',
+                     baseurl='%s/%s/%s/' % (repoMap['euca2ools'],
+                                            self.distroversion,
+                                            self.conf.yumvar['basearch']),
+                     ignoreHostConf=True)
+    else:
+      self.setupRepo('euca2ools', 'euca2ools-release',
                    baseurl="http://downloads.eucalyptus.com/software/euca2ools/2.1/centos/%s/%s/" % 
                    (self.distroversion, self.conf.yumvar['basearch']))
 
@@ -560,13 +611,13 @@ class SilvereyeBuilder(yum.YumBase):
     # It would be nice to do all of the ImageMagick stuff with PIL, but I don't know how.
     os.environ['ELVERSION'] = self.distroversion
     os.environ['BUILDDIR'] = self.builddir
-    retcode = subprocess.call([os.path.join(basedir, 'scripts', 'create_silvereye_boot_logo.sh')], 
+    retcode = subprocess.call([os.path.join(self.basedir, 'scripts', 'create_silvereye_boot_logo.sh')], 
                       stdout=self.cmdout, stderr=self.cmdout, cwd=tmplogo)
     shutil.rmtree(tmplogo)
 
   # Replace the boot menu
   def createBootMenu(self):
-    bootcfgdir = os.path.join(basedir, 'isolinux', self.distroversion)
+    bootcfgdir = os.path.join(self.basedir, 'isolinux', self.distroversion)
     for bootfile in os.listdir(bootcfgdir):
       shutil.copyfile(os.path.join(bootcfgdir, bootfile), 
                       os.path.join(self.imgdir, 'isolinux', bootfile))
@@ -597,17 +648,5 @@ class SilvereyeBuilder(yum.YumBase):
     self.logger.info("CD image " + self.isofile + " successfully created")
 
 if __name__ == "__main__":
-  args = parser.parse_args()
-
-  sys.excepthook = gen_except_hook(args.debugger, args.debug)
-
-  basedir=os.path.dirname(sys.argv[0])
-  if not basedir:
-    basedir=os.getcwd()
-  else:
-    basedir=os.path.abspath(basedir)
-
-  builder = SilvereyeBuilder(basedir) 
-  builder.configure(args)
-  builder.setupLogging()
-  builder.doBuild()
+  cli = SilvereyeCLI()
+  cli.run()

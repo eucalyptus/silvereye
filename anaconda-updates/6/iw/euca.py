@@ -8,6 +8,7 @@ import language
 import shutil
 import traceback
 from flags import flags
+from constants import *
 
 import logging
 log = logging.getLogger("anaconda")
@@ -37,7 +38,7 @@ def memCheck(anaconda):
                                       _("This installation requires at least "
                                         "2 GB (2048 MB) of RAM to function "
                                         "properly. This system appears to "
-                                        "have %d MB of RAM."),
+                                        "have %d MB of RAM." % totalMem),
                                    type="custom", custom_icon="warning",
                                    custom_buttons=[_("_Exit"), _("_Install anyway")])
         if not rc:

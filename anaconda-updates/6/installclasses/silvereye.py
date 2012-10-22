@@ -42,14 +42,14 @@ class InstallClass(BaseInstallClass):
 
     tasks = [(N_("Eucalyptus Cloud in a Box"),
               ["core", "eucalyptus-cloud-controller",
-               "eucalyptus-sc", "eucalyptus-walrus",
-               "eucalyptus-cc", "eucalyptus-nc"]),
+               "eucalyptus-storage-controller", "eucalyptus-walrus",
+               "eucalyptus-cluster-controller", "eucalyptus-node-controller"]),
              (N_("Eucalyptus Front-end Only"),
               ["core", "eucalyptus-cloud-controller",
-               "eucalyptus-sc", "eucalyptus-walrus",
-               "eucalyptus-cc"]),
+               "eucalyptus-storage-controller", "eucalyptus-walrus",
+               "eucalyptus-cluster-controller"]),
              (N_("Eucalyptus Node Controller Only"),
-              ["core", "eucalyptus-nc"]),
+              ["core", "eucalyptus-node-controller"]),
              (N_("Minimal"),
               ["core"])]
  
@@ -67,9 +67,9 @@ class InstallClass(BaseInstallClass):
 
     def setSteps(self, anaconda):
         BaseInstallClass.setSteps(self, anaconda)
-        anaconda.dispatch.skipStep("partition")
+        # Unskip memcheck
+        anaconda.dispatch.skipStep("memcheck", skip = 0)
         anaconda.dispatch.skipStep("betanag",permanent=1)
-        anaconda.dispatch.skipStep("package-selection")
 
     def getBackend(self):
         if flags.livecdInstall:
@@ -77,49 +77,6 @@ class InstallClass(BaseInstallClass):
             return livecd.LiveCDCopyBackend
         else:
             return yuminstall.YumBackend
-
-    def productMatches(self, oldprod):
-        if oldprod is None:
-            return False
-
-        if oldprod.startswith(productName):
-            return True
-
-        productUpgrades = {
-            "CentOS": ("CentOS release", ),
-            "Red Hat Enterprise Linux AS": ("Red Hat Linux Advanced Server", ),
-            "Red Hat Enterprise Linux WS": ("Red Hat Linux Advanced Workstation",),
-            # FIXME: this probably shouldn't be in a release...
-            "Red Hat Enterprise Linux": ("Red Hat Linux Advanced Server",
-                                         "Red Hat Linux Advanced Workstation",
-                                         "Red Hat Enterprise Linux AS",
-                                         "Red Hat Enterprise Linux ES",
-                                         "Red Hat Enterprise Linux WS"),
-            "Red Hat Enterprise Linux Server": ("Red Hat Enterprise Linux AS",
-                                                "Red Hat Enterprise Linux ES",
-                                                "Red Hat Enterprise Linux WS",
-                                                "Red Hat Enterprise Linux"),
-            "Red Hat Enterprise Linux Client": ("Red Hat Enterprise Linux WS",
-                                                "Red Hat Enterprise Linux Desktop",
-                                                "Red Hat Enterprise Linux"),
-        }
-
-        if productUpgrades.has_key(productName):
-            acceptable = productUpgrades[productName]
-        else:
-            acceptable = ()
-
-        for p in acceptable:
-            if oldprod.startswith(p):
-                return True
-
-        return False
-
-    def versionMatches(self, oldver):
-        oldMajor = oldver.split(".")[0]
-        newMajor = productVersion.split(".")[0]
-
-        return oldMajor == newMajor
 
     def __init__(self):
         BaseInstallClass.__init__(self)
