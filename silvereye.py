@@ -27,6 +27,7 @@
 # present on the system this script will install/create them.
 
 import argparse
+import glob
 import gzip
 import logging
 import os
@@ -35,7 +36,7 @@ import shutil
 import subprocess
 from StringIO import StringIO
 import sys
-from tempfile import mkstemp
+from tempfile import mkstemp, mkdtemp
 import time
 import urllib2
 import yum
@@ -57,6 +58,7 @@ def gen_except_hook(debugger_flag, debug_flag):
       if debugger.__name__ == 'epdb':
         debugger.post_mortem(tb, typ, value)
       else:
+        print traceback.print_tb(tb)
         debugger.post_mortem(tb)
     elif debug_flag:
       print traceback.print_tb(tb)
@@ -106,6 +108,12 @@ parser.add_argument('--distroversion',
                     help='(EXPERIMENTAL) The version of $DISTRONAME to use')
 parser.add_argument('--noclean', action="store_true",
                     help='Reuse contents in builddir')
+parser.add_argument('--cachedir',
+                    help='The yum cache directory')
+parser.add_argument('--updatesurl', 
+                    help='Fetch an updates img via url (CD will boot in debug mode)')
+parser.add_argument('--quiet', action="store_true",
+                    help='Suppress non-log output')
 
 class SilvereyeBuilder(yum.YumBase):
   def __init__(self, basedir, **kwargs):
@@ -123,6 +131,8 @@ class SilvereyeBuilder(yum.YumBase):
     hostdistroname, hostdistroversion = get_distro_and_version()
     self.distroname = kwargs.get('distroname', hostdistroname)
     self.distroversion = kwargs.get('distroversion', hostdistroversion)
+    self.updatesurl = None
+    self.cmdout = None
     self.builddir = kwargs.get('builddir',
                                 os.path.join(os.getcwd(), 
                                              'silvereye_build.' + self.datestamp))
@@ -135,7 +145,7 @@ class SilvereyeBuilder(yum.YumBase):
 
   def configure(self, parsedargs):
     for attr in [ 'builddir', 'distroname', 'distroversion',
-                  'eucaversion', 'isofile' ]:
+                  'eucaversion', 'isofile', 'updatesurl' ]:
       value = getattr(parsedargs, attr)
       if value is not None:
         setattr(self, attr, value)
@@ -148,9 +158,24 @@ class SilvereyeBuilder(yum.YumBase):
     if parsedargs.verbose:
       self.logger.setLevel(logging.DEBUG)
 
+    tmpdir = '/var/tmp'
+    if parsedargs.cachedir:
+      tmpdir = os.path.abspath(parsedargs.cachedir)
+      mkdir(tmpdir)
+    self.setCacheDir(tmpdir=tmpdir)
+    # This is for yumdownloader calls
+    os.environ['TMPDIR'] = tmpdir
+
+    if parsedargs.quiet:
+      self.cmdout = open('/dev/null', 'w')
+
   @property 
   def pkgdir(self):
     return os.path.join(self.builddir, 'image', 'CentOS')
+
+  @property
+  def imgdir(self):
+    return os.path.join(self.builddir, 'image')
 
   def setupLogging(self, verbose=False):
     # Enable logging to a file in the build directory
@@ -222,10 +247,10 @@ class SilvereyeBuilder(yum.YumBase):
 
     # Create the build directory structure
     for x in [ 'CentOS', 'images/pxeboot', 'isolinux', 'ks', 'scripts' ]:
-      mkdir(os.path.join(self.builddir, 'image', x))
+      mkdir(os.path.join(self.imgdir, x))
 
     if self.distroversion == "5":
-      mkdir(os.path.join(self.builddir, 'image', 'images', 'xen'))
+      mkdir(os.path.join(self.imgdir, 'images', 'xen'))
 
     self.logger.info("Created %s directory structure" % self.builddir)
     self.logger.info("Using %s for downloads" % downloadUrl)
@@ -259,10 +284,10 @@ class SilvereyeBuilder(yum.YumBase):
 
     for x in fileset:
       # we should probably compare timestamps here
-      if not os.path.exists(os.path.join(self.builddir, 'image', x)):
+      if not os.path.exists(os.path.join(self.imgdir, x)):
         self.logger.info("Downloading " + downloadUrl + x)
         chunked_download(downloadUrl + x,
-                         os.path.join(self.builddir, 'image', x))
+                         os.path.join(self.imgdir, x))
 
   def getImageFiles(self):
     repo = self.repos.getRepo('base')
@@ -293,19 +318,19 @@ class SilvereyeBuilder(yum.YumBase):
 
     for x in imgfileset:
       # we should probably compare timestamps here
-      if not os.path.exists(os.path.join(self.builddir, 'image', 'images', x)):
+      if not os.path.exists(os.path.join(self.imgdir, 'images', x)):
         self.logger.info("Downloading " + downloadUrl + 'images/' + x)
         chunked_download(downloadUrl + 'images/' + x,
-                         os.path.join(self.builddir, 'image', 'images', x))
+                         os.path.join(self.imgdir, 'images', x))
   def makeUpdatesImg(self):
     sudo = []
     # Fix anaconda bugs to allow copying files from CD during %post
     # scripts in EL5, and network prompting in EL6
     updatesdir = os.path.join(self.builddir, 'updates')
-    mkdir(updatesdir)
-    updatesimg = os.path.join(self.builddir, 'image', 'images', 'updates.img')
+    updatesimg = os.path.join(self.imgdir, 'images', 'updates.img')
 
     if self.distroversion == "5":
+      mkdir(updatesdir)
       if os.geteuid() != 0:
         self.logger.warning("Not running as root; attempting to use sudo for mount/umount")
         sudo = ['sudo']
@@ -315,8 +340,10 @@ class SilvereyeBuilder(yum.YumBase):
       imgfile.write('\0')
       imgfile.close()
 
-      subprocess.call(["/sbin/mkfs.ext2", "-F", "-L", "updates", updatesimg])
-      subprocess.call(sudo + [ "/bin/mount", "-o", "loop", updatesimg, updatesdir ])
+      subprocess.call(["/sbin/mkfs.ext2", "-F", "-L", "updates", updatesimg], 
+                      stdout=self.cmdout, stderr=self.cmdout)
+      subprocess.call(sudo + [ "/bin/mount", "-o", "loop", updatesimg, updatesdir ],
+                      stdout=self.cmdout, stderr=self.cmdout)
       os.chmod(updatesdir, 0777)
       f = open('/usr/lib/anaconda/dispatch.py', 'r')
       g = open('updates/dispatch.py', 'w')
@@ -330,8 +357,12 @@ class SilvereyeBuilder(yum.YumBase):
                                '("dopostaction", doPostAction, )'))
       f.close()
       g.close()
-      subprocess.call(sudo + ['/bin/umount', updatesdir ])
+      subprocess.call(sudo + ['/bin/umount', updatesdir ],
+                      stdout=self.cmdout, stderr=self.cmdout)
     elif self.distroversion == "6":
+      if os.path.exists(updatesdir):
+        shutil.rmtree(updatesdir)
+      shutil.copytree(os.path.join(basedir, 'anaconda-updates', self.distroversion), updatesdir)
       f = open('/usr/lib/anaconda/kickstart.py', 'r')
       g = open(os.path.join(updatesdir, 'kickstart.py'), 'w')
       for line in f.readlines():
@@ -340,15 +371,21 @@ class SilvereyeBuilder(yum.YumBase):
         g.write(line)
       f.close()
       g.close()
+      filelist = []
+      def appender(ign, dir, files):
+        filelist.extend([ os.path.join(dir.replace(updatesdir, '.'), f) for f in files ])
+      os.path.walk(updatesdir, appender, None)
       p = subprocess.Popen(['cpio', '-H', 'newc', '-o'],
                        cwd=os.path.abspath(updatesdir),
                        stdin=subprocess.PIPE,
-                       stdout=gzip.open(updatesimg, 'w'))
-      p.communicate(input='kickstart.py')
+                       stdout=subprocess.PIPE)
+      zipball = gzip.GzipFile(updatesimg, 'w')
+      zipball.write(p.communicate(input='\n'.join(filelist))[0])
+      zipball.close()
 
   def createKickstartFiles(self):
     # Create kickstart files
-    ksdest = os.path.join(self.builddir, 'image', 'ks')
+    ksdest = os.path.join(self.imgdir, 'ks')
     ksTmplDir = os.path.join(self.basedir, 'ks_templates')
     for ks in os.listdir(ksTmplDir):
       dest = open(os.path.join(ksdest, ks), 'w')
@@ -369,7 +406,7 @@ class SilvereyeBuilder(yum.YumBase):
                     'eucalyptus-nc-config.sh',
                     'eucalyptus-create-emi.sh' ]:
       shutil.copyfile(os.path.join(self.basedir, 'scripts', script),
-                      os.path.join(self.builddir, 'image', 'scripts', script))
+                      os.path.join(self.imgdir, 'scripts', script))
 
   # Configure yum repositories
   def setupRepo(self, pkgname, repoid, ignoreHostCfg=False, mirrorlist=None, baseurl=None):
@@ -454,16 +491,17 @@ class SilvereyeBuilder(yum.YumBase):
     if self.distroversion == "6":
       self.conf.releasever = self.distroversion
       self.conf.plugins=1
-    self.conf.write(open('yum.conf', 'w'))
+    yumconf = os.path.join(self.builddir, 'yum.conf')
+    self.conf.write(open(yumconf, 'w'))
 
-    # TODO: convert this to API
+    # TODO: convert this to API?
     if self.distroversion == "5":
-      subprocess.call(['yumdownloader', 'centos-release'])
-      for x in os.listdir('.'):
-        if x.startswith('centos-release'):
-          subprocess.call(['rpm', '-iv', '--nodeps', '--justdb', '--root',
-                           self.builddir, x])
-          break
+      subprocess.call(['yumdownloader', 'centos-release'],
+                      stdout=self.cmdout, stderr=self.cmdout)
+      centospkg = glob.glob('centos-release-*')[0]
+      subprocess.call(['rpm', '-iv', '--nodeps', '--justdb', '--root',
+                           self.builddir, centospkg],
+                      stdout=self.cmdout, stderr=self.cmdout)
 
     yumrepodir = os.path.join(self.builddir, 'etc', 'yum.repos.d')
     mkdir(yumrepodir)
@@ -485,16 +523,23 @@ class SilvereyeBuilder(yum.YumBase):
         raise Exception('repo %s not configured' % repoid)
 
     self.logger.info("Downloading packages")
-    subprocess.call(['yumdownloader', '-c', 'yum.conf',
+    releasever = []
+    if self.distroversion == "6":
+      releasever = [ '--releasever', '6' ]
+    subprocess.call(['yumdownloader', '-c', yumconf,
                      '--resolve', '--installroot', self.builddir,
-                     '--destdir', self.pkgdir ] + list(rpms) ) 
+                     '--destdir', self.pkgdir ] + releasever + list(rpms),
+                      stdout=self.cmdout, stderr=self.cmdout) 
 
   # Create a repository
   def createRepo(self):
     compsfile = os.path.join(self.builddir, 'comps.xml')
     self.logger.info("Creating repodata")
-    subprocess.call(['createrepo', '-u', 'media://' + self.datestamp, '-o', 'image',
-                     '-g', compsfile, 'image'])
+    retcode = subprocess.call(['createrepo', '-u', 'media://' + self.datestamp, '-o', self.imgdir,
+                     '-g', compsfile, self.imgdir ],
+                      stdout=self.cmdout, stderr=self.cmdout)
+    if retcode:
+      raise Exception("creatrepo failed!!")
     self.logger.info("Repo created")
 
   # Create boot logo
@@ -502,19 +547,21 @@ class SilvereyeBuilder(yum.YumBase):
     self.logger.info("Creating boot logo")
     tmplogo = os.path.join(self.builddir, 'tmplogo')
     mkdir(tmplogo)
-    javarpm = [ x for x in os.listdir(self.pkgdir) if x.startswith('eucalyptus-common-java-3') ][0]
+    javarpm = glob.glob(os.path.join(self.pkgdir, 'eucalyptus-common-java-3*'))[0]
 
     p1 = subprocess.Popen(["rpm2cpio", os.path.join(self.pkgdir, javarpm) ], stdout=subprocess.PIPE)
     p2 = subprocess.Popen(['cpio', '-idm', './var/lib/eucalyptus/webapps/root.war' ], 
                           stdin=p1.stdout, cwd=tmplogo)
     p1.stdout.close()
     p2.wait()
-    subprocess.call(['unzip', './var/lib/eucalyptus/webapps/root.war'], cwd=tmplogo)
+    subprocess.call(['unzip', './var/lib/eucalyptus/webapps/root.war'], 
+                      stdout=self.cmdout, stderr=self.cmdout, cwd=tmplogo)
 
     # It would be nice to do all of the ImageMagick stuff with PIL, but I don't know how.
     os.environ['ELVERSION'] = self.distroversion
     os.environ['BUILDDIR'] = self.builddir
-    retcode = subprocess.call([os.path.join(basedir, 'scripts', 'create_silvereye_boot_logo.sh')], cwd=tmplogo)
+    retcode = subprocess.call([os.path.join(basedir, 'scripts', 'create_silvereye_boot_logo.sh')], 
+                      stdout=self.cmdout, stderr=self.cmdout, cwd=tmplogo)
     shutil.rmtree(tmplogo)
 
   # Replace the boot menu
@@ -522,7 +569,14 @@ class SilvereyeBuilder(yum.YumBase):
     bootcfgdir = os.path.join(basedir, 'isolinux', self.distroversion)
     for bootfile in os.listdir(bootcfgdir):
       shutil.copyfile(os.path.join(bootcfgdir, bootfile), 
-                      os.path.join(self.builddir, 'image', 'isolinux', bootfile))
+                      os.path.join(self.imgdir, 'isolinux', bootfile))
+    if self.updatesurl:
+      isolinuxcfg = open(os.path.join(self.imgdir, 'isolinux', 'isolinux.cfg'), 'r').readlines()
+      newcfg = open(os.path.join(self.imgdir, 'isolinux', 'isolinux.cfg'), 'w')
+      for x in isolinuxcfg:
+        newcfg.write(re.sub(r'(.*append initrd=.*)', 
+                            r'\1 debug=1 updates=%s' % self.updatesurl, x))
+      newcfg.close()
 
   # Create the .iso image
   def createISO(self):
@@ -532,11 +586,14 @@ class SilvereyeBuilder(yum.YumBase):
                      '-c', 'isolinux/boot.cat',
                      '-no-emul-boot', '-boot-load-size', '4',
                      '-boot-info-table', '-R', '-J', '-v', '-T', '-joliet-long',
-                   os.path.join(self.builddir, 'image') ])
+                   self.imgdir ],
+                      stdout=self.cmdout, stderr=self.cmdout)
     if self.distroversion == "5":
-      subprocess.call(["/usr/lib/anaconda-runtime/implantisomd5", self.isofile])
+      subprocess.call(["/usr/lib/anaconda-runtime/implantisomd5", self.isofile],
+                      stdout=self.cmdout, stderr=self.cmdout)
     else:
-      subprocess.call(["/usr/bin/implantisomd5", self.isofile])
+      subprocess.call(["/usr/bin/implantisomd5", self.isofile],
+                      stdout=self.cmdout, stderr=self.cmdout)
     self.logger.info("CD image " + self.isofile + " successfully created")
 
 if __name__ == "__main__":
