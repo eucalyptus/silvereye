@@ -925,7 +925,7 @@ case "$INSTALLDESKTOP" in
     shutdown -r now
     ;;
   n|N|no|NO|No)
-    echo "Please visit https://$PUBLIC_IP_ADDRESS:8443/ to start using your cloud!"
+    echo "Point any browser on your network to https://$PUBLIC_IP_ADDRESS:8443/ to start using your cloud!"
     echo ""
     ;;
 esac
