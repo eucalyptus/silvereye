@@ -796,7 +796,11 @@ while ! echo "$CONFIGUREFRONTEND" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null 
     configure_frontend
     echo "$(date)- Configured Eucalyptus services." | tee -a $LOGFILE
     echo ""
-    echo "This machine is ready and running as a Cloud Controller."
+    if [ $CIAB = "N" ] ; then
+      echo "This machine is ready and running as a Cloud Controller."
+    else
+      echo "This machine is ready and running as a cloud-in-a-box."
+    fi
     echo ""
     ;;
   n|N|no|NO|No)
