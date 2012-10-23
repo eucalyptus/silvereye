@@ -123,6 +123,10 @@ class SilvereyeCLI():
                         help='Set the base URL for your Eucalyptus repository')
     parser.add_argument('--euca2ools-repo',
                         help='Set the base URL for your Euca2ools repository')
+    parser.add_argument('--kexec-kernel-url',
+                        help='URL from which to download the kexec loader kernel')
+    parser.add_argument('--kexec-initramfs-url',
+                        help='URL from which to download the kexec loader initramfs')
     self.parser = parser
 
   def run(self):
@@ -132,6 +136,7 @@ class SilvereyeCLI():
     for attr in [ 'builddir', 'distroname', 'distroversion',
                   'eucaversion', 'isofile', 'updatesurl',
                   'cachedir', 'verbose', 'quiet', 'noclean',
+                  'kexec_kernel_url', 'kexec_initramfs_url'
                 ]:
       value = getattr(parsedargs, attr)
       if value is not None:
@@ -150,11 +155,12 @@ class SilvereyeCLI():
     builder.installBuildDeps()
     builder.getIsolinuxFiles()
     builder.getImageFiles()
-    builder.makeUpdatesImg()
+    builder.getKexecFiles()
     builder.createKickstartFiles()
     builder.copyConfigScripts()
     builder.setupRequiredRepos(repoMap=repoMap)
     builder.downloadPackages()
+    builder.makeUpdatesImg()
     builder.createRepo()
     builder.createBootLogo()
     builder.createBootMenu()
@@ -209,6 +215,12 @@ class SilvereyeBuilder(yum.YumBase):
     self.setCacheDir(tmpdir=tmpdir)
     # This is for yumdownloader calls
     os.environ['TMPDIR'] = tmpdir
+
+    # TODO: Make more official download links
+    self.kexec_kernel = kwargs.get('kexec_kernel_url',
+                                   'https://raw.github.com/monolive/euca-single-kernel/master/examples/vmlinuz')
+    self.kexec_initramfs = kwargs.get('kexec_initramfs_url',
+                                      'https://raw.github.com/monolive/euca-single-kernel/master/examples/initrd-kexec_load')
 
   @property 
   def pkgdir(self):
@@ -392,8 +404,8 @@ class SilvereyeBuilder(yum.YumBase):
         shutil.rmtree(updatesdir)
       shutil.copytree(os.path.join(self.basedir, 'anaconda-updates', self.distroversion), updatesdir)
       pixmapDir = os.path.join(updatesdir, 'pixmaps')
-      shutil.copyfile(self.getLogo(), os.path.join(pixmapDir, 'splash.png')
-      os.link(os.path.join(pixmapDir, 'splash.png'), os.path.join(pixmapDir, 'pixmaps/progress_first.png'))
+      shutil.copyfile(self.getLogo(), os.path.join(pixmapDir, 'splash.png'))
+      os.link(os.path.join(pixmapDir, 'splash.png'), os.path.join(pixmapDir, 'progress_first.png'))
 
       # TODO: Remove this, I think, because we no longer rely on kickstart for EL6
       f = open('/usr/lib/anaconda/kickstart.py', 'r')
@@ -441,6 +453,18 @@ class SilvereyeBuilder(yum.YumBase):
                     'eucalyptus-create-emi.sh' ]:
       shutil.copyfile(os.path.join(self.basedir, 'scripts', script),
                       os.path.join(self.imgdir, 'scripts', script))
+
+  def getKexecFiles(self):
+    urlRE = re.compile(r'(https?|ftp)://')
+    if urlRE.match(self.kexec_kernel):
+      chunked_download(self.kexec_kernel, os.path.join(self.imgdir, 'scripts', 'vmlinuz-kexec'))
+    else:
+      shutil.copyfile(self.kexec_kernel, os.path.join(self.imgdir, 'scripts', 'vmlinuz-kexec'))
+
+    if urlRE.match(self.kexec_initramfs):
+      chunked_download(self.kexec_initramfs, os.path.join(self.imgdir, 'scripts', 'initramfs-kexec'))
+    else:
+      shutil.copyfile(self.kexec_initramfs, os.path.join(self.imgdir, 'scripts', 'initramfs-kexec'))
 
   # Configure yum repositories
   def setupRepo(self, repoid, pkgname=None, ignoreHostCfg=False, mirrorlist=None, baseurl=None):
