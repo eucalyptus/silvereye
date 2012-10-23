@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from installclass import BaseInstallClass
+import silvereye
 from constants import *
 from product import *
 from flags import flags
@@ -23,19 +23,19 @@ import os
 import re
 import types
 
-import installmethod
-import yuminstall
-
-class InstallClass(BaseInstallClass):
+class InstallClass(silvereye.InstallClass):
     # name has underscore used for mnemonics, strip if you dont need it
-    id = "silvereye"
-    name = N_("Silvereye Eucalyptus Installer")
+    id = "cloudinabox"
+    name = N_("Silvereye Eucalyptus Cloud-in-a-box Installer")
     _description = N_("The default installation of %s is a 'Cloud in a Box'"
                       "install. You can optionally select a different set of"
                       "software now.")
     _descriptionFields = (productName,)
     sortPriority = 10099
-    hidden = 0
+    if flags.cmdline.has_key('ciab'):
+      hidden = 0
+    else:
+      hidden = 1
 
     bootloaderTimeoutDefault = 5
     bootloaderExtraArgs = ["crashkernel=auto"]
@@ -44,39 +44,29 @@ class InstallClass(BaseInstallClass):
               ["core", "eucalyptus-cloud-controller",
                "eucalyptus-storage-controller", "eucalyptus-walrus",
                "eucalyptus-cluster-controller", "eucalyptus-node-controller"]),
-             (N_("Eucalyptus Front-end Only"),
-              ["core", "eucalyptus-cloud-controller",
-               "eucalyptus-storage-controller", "eucalyptus-walrus",
-               "eucalyptus-cluster-controller"]),
-             (N_("Eucalyptus Node Controller Only"),
-              ["core", "eucalyptus-node-controller"]),
-             (N_("Minimal"),
-              ["core"])]
+              ]
  
-    def getPackagePaths(self, uri):
-        if not type(uri) == types.ListType:
-            uri = [uri,]
-
-        return {productName: uri}
+    def setGroupSelection(self, anaconda):
+        silvereye.InstallClass.setGroupSelection(self, anaconda)
+        map(lambda x: anaconda.backend.selectGroup(x), 
+                      ["core", "eucalyptus-cloud-controller",
+                       "eucalyptus-storage-controller", "eucalyptus-walrus",
+                       "eucalyptus-cluster-controller", "eucalyptus-node-controller"])
 
     def setInstallData(self, anaconda):
-        BaseInstallClass.setInstallData(self, anaconda)
-        BaseInstallClass.setDefaultPartitioning(self,
-                                                anaconda.id.storage,
-                                                anaconda.platform)
+        silvereye.InstallClass.setInstallData(self, anaconda)
+        anaconda.id.firewall.portlist.extend([ '53:tcp',
+                                               '53:udp',
+                                               '67:udp',
+                                               '3260:tcp',
+                                               '8443:tcp',
+                                               '8772:tcp',
+                                               '8773:tcp',
+                                               '8774:tcp',
+                                               '8775:tcp' ])
 
     def setSteps(self, anaconda):
-        BaseInstallClass.setSteps(self, anaconda)
-        # Unskip memcheck
-        anaconda.dispatch.skipStep("memcheck", skip = 0)
-        anaconda.dispatch.skipStep("betanag",permanent=1)
-
-    def getBackend(self):
-        if flags.livecdInstall:
-            import livecd
-            return livecd.LiveCDCopyBackend
-        else:
-            return yuminstall.YumBackend
+        silvereye.InstallClass.setSteps(self, anaconda)
 
     def __init__(self):
-        BaseInstallClass.__init__(self)
+        silvereye.InstallClass.__init__(self)

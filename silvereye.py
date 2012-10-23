@@ -631,13 +631,18 @@ class SilvereyeBuilder(yum.YumBase):
 
   # Create the .iso image
   def createISO(self):
-    subprocess.call(['mkisofs', 
+    excludeUpdates = []
+    if self.updatesurl:
+      excludeUpdates = [ '-exclude', 'updates.img' ]
+    cmd = ['mkisofs', 
                      '-o', self.isofile, 
                      '-b', 'isolinux/isolinux.bin',
                      '-c', 'isolinux/boot.cat',
                      '-no-emul-boot', '-boot-load-size', '4',
-                     '-boot-info-table', '-R', '-J', '-v', '-T', '-joliet-long',
-                   self.imgdir ],
+                     '-boot-info-table', '-R', '-J', '-v', '-T', '-joliet-long' ] + \
+                     excludeUpdates + [ self.imgdir ]
+    print ' '.join(cmd)
+    subprocess.call(cmd,
                       stdout=self.cmdout, stderr=self.cmdout)
     if self.distroversion == "5":
       subprocess.call(["/usr/lib/anaconda-runtime/implantisomd5", self.isofile],
