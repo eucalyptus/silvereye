@@ -122,11 +122,84 @@ EUCACONF_PUBINTERFACE=`grep '^VNET_PUBINTERFACE' /etc/eucalyptus/eucalyptus.conf
 EUCACONF_PRIVINTERFACE=`grep '^VNET_PRIVINTERFACE' /etc/eucalyptus/eucalyptus.conf | sed -e 's/VNET_PRIVINTERFACE=\"\(.*\)\"/\1/'`
 EUCACONF_PUBINTERFACEIPS=`ip addr | grep inet | grep $EUCACONF_PUBINTERFACE | wc -l`
 EUCACONF_PRIVINTERFACEIPS=`ip addr | grep inet | grep $EUCACONF_PRIVINTERFACE | wc -l`
-if [ $EUCACONF_PUBINTERFACEIPS -eq 0 ] ; then
-  sed -i -e "s/^VNET_PUBINTERFACE.*$/VNET_PUBINTERFACE=\"$DEFAULTROUTEINTERFACE\"/" /etc/eucalyptus/eucalyptus.conf >>$LOGFILE 2>&1
+if [ $DEFAULTROUTEINTERFACE ] ; then
+  if [ $EUCACONF_PUBINTERFACEIPS -eq 0 ] ; then
+    sed -i -e "s/^VNET_PUBINTERFACE.*$/VNET_PUBINTERFACE=\"$DEFAULTROUTEINTERFACE\"/" /etc/eucalyptus/eucalyptus.conf >>$LOGFILE 2>&1
+  fi
+  if [ $EUCACONF_PRIVINTERFACEIPS -eq 0 ] ; then
+    sed -i -e "s/^VNET_PRIVINTERFACE.*$/VNET_PRIVINTERFACE=\"$DEFAULTROUTEINTERFACE\"/" /etc/eucalyptus/eucalyptus.conf >>$LOGFILE 2>&1
+  fi
 fi
-if [ $EUCACONF_PRIVINTERFACEIPS -eq 0 ] ; then
-  sed -i -e "s/^VNET_PRIVINTERFACE.*$/VNET_PRIVINTERFACE=\"$DEFAULTROUTEINTERFACE\"/" /etc/eucalyptus/eucalyptus.conf >>$LOGFILE 2>&1
+
+# Test for Internet connectivity, and give the user a chance to exit prior to NTP sync
+curl http://www.eucalyptus.com/ >/dev/null 2>&1
+if [ $? -ne 0 ] ; then
+  echo ""
+  echo "***************"
+  echo "*** WARNING ***"
+  echo "***************"
+  echo ""
+  echo "This system is unable to reach www.eucalyptus.com on the Internet."
+  echo ""
+  echo "If your system should have Internet connectivity, then this is likely the result"
+  echo "of incorrect network settings."
+  echo ""
+  echo "The next section of this script uses Internet connectivity to set the system"
+  echo "clock and will not function correctly without it."
+  RECONFIGURENETWORK=""
+  while ! echo "$RECONFIGURENETWORK" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
+    RECONFIGURENETWORK="Yes"
+    echo ""
+    read -p "Would you like to exit this script to reconfigure your network? [$RECONFIGURENETWORK] " reconfigure_network
+    if [ $reconfigure_network ]
+    then
+      RECONFIGURENETWORK=$reconfigure_network
+    fi
+    echo ""
+    case "$RECONFIGURENETWORK" in
+    y|Y|yes|YES|Yes)
+      echo "Please fix your network settings using one of the methods below:"
+      echo ""
+      echo "1) Use the 'system-config-network' command to get a menu-driven interface for"
+      echo "   modifying your network settings."
+      echo ""
+      echo "2) Manually edit one or more of these network configuration files:"
+      echo "   a) /etc/sysconfig/network-scripts/ifcfg-*"
+      echo "   b) /etc/sysconfig/network"
+      echo "   c) /etc/sysconfig/resolv.conf"
+      echo ""
+      case "$ELVERSION" in
+      "5")
+        echo "3) Re-install your system, and make sure you enter the correct networking"
+        echo "   information on the appropriate screen."
+      ;;
+      "6")
+        echo "3) Re-install your system, and make sure you click the 'Configure Network'"
+        echo "   button when prompted to enter your hostname.  Also make sure to check the"
+        echo "   'Connect Automatically' box for each network interface that you want enabled"
+        echo "   when the system boots."
+      ;;
+      esac
+      echo ""
+      echo "If you choose (1) or (2) to fix your existing installation, use"
+      echo "'service network restart' to apply your networking changes, then re-run this"
+      echo "configuration script, /usr/local/sbin/eucalyptus-frontend-config.sh"
+      echo ""
+      exit -1;
+      ;;
+    n|N|no|NO|No)
+      echo ""
+      echo "$(date)- Continuing without Internet connectivity." | tee -a $LOGFILE
+      echo ""
+      echo "It is recommended that you skip NTP configuration and syncronization in the"
+      echo "next step."
+      echo ""
+      ;;
+    *)
+      echo "Please answer either 'yes' or 'no'."
+      ;;
+    esac
+  done
 fi
 
 # Set clock and enable ntpd service
@@ -141,7 +214,11 @@ echo "synchronize their clocks with the default pool.ntp.org servers, please ans
 echo "yes."
 echo ""
 while ! echo "$ENABLENTPSYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
-  ENABLENTPSYNC="Yes"
+  if [ $RECONFIGURENETWORK ] ; then
+    ENABLENTPSYNC="No"
+  else
+    ENABLENTPSYNC="Yes"
+  fi
   read -p "Would you like to enable NTP and synchronize clock? [$ENABLENTPSYNC] " enable_ntp_sync
   if [ $enable_ntp_sync ] 
   then
