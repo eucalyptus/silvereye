@@ -4,8 +4,7 @@
 case "$ELVERSION" in
 "5")
   convert -size 640x120 xc:#ffffff white_background.png
-  convert themes/eucalyptus/logo.png -resize 250% large-logo.png
-  composite -gravity center large-logo.png white_background.png splash.png
+  composite -gravity center $LOGOFILE white_background.png splash.png
   convert splash.png -depth 8 -colors 14 splash.ppm
   ppmtolss16 < splash.ppm > ${BUILDDIR}/image/isolinux/splash.lss 
 ;;
@@ -16,7 +15,6 @@ case "$ELVERSION" in
   convert -size 1x1 xc:#abbfca bottom.png
   convert top.png bottom.png -append merged.png
   convert merged.png -resize 640x480\! gradient_background.png
-  convert themes/eucalyptus/logo.png -resize 250% large-logo.png
-  composite -gravity south -geometry +0+50 large-logo.png gradient_background.png ${BUILDDIR}/image/isolinux/splash.jpg
+  composite -gravity south -geometry +0+50 $LOGOFILE gradient_background.png ${BUILDDIR}/image/isolinux/splash.jpg
 ;;
 esac

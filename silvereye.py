@@ -391,6 +391,11 @@ class SilvereyeBuilder(yum.YumBase):
       if os.path.exists(updatesdir):
         shutil.rmtree(updatesdir)
       shutil.copytree(os.path.join(self.basedir, 'anaconda-updates', self.distroversion), updatesdir)
+      pixmapDir = os.path.join(updatesdir, 'pixmaps')
+      shutil.copyfile(self.getLogo(), os.path.join(pixmapDir, 'splash.png')
+      os.link(os.path.join(pixmapDir, 'splash.png'), os.path.join(pixmapDir, 'pixmaps/progress_first.png'))
+
+      # TODO: Remove this, I think, because we no longer rely on kickstart for EL6
       f = open('/usr/lib/anaconda/kickstart.py', 'r')
       g = open(os.path.join(updatesdir, 'kickstart.py'), 'w')
       for line in f.readlines():
@@ -399,6 +404,7 @@ class SilvereyeBuilder(yum.YumBase):
         g.write(line)
       f.close()
       g.close()
+
       filelist = []
       def appender(ign, dir, files):
         filelist.extend([ os.path.join(dir.replace(updatesdir, '.'), f) for f in files ])
@@ -594,26 +600,42 @@ class SilvereyeBuilder(yum.YumBase):
     self.logger.info("Repo created")
 
   # Create boot logo
-  def createBootLogo(self):
-    self.logger.info("Creating boot logo")
-    tmplogo = os.path.join(self.builddir, 'tmplogo')
-    mkdir(tmplogo)
+  def getLogo(self):
+    tmplogo = os.path.join(self.builddir, 'splash.png')
+
+    if os.path.exists(tmplogo):
+      return tmplogo
+
     javarpm = glob.glob(os.path.join(self.pkgdir, 'eucalyptus-common-java-3*'))[0]
 
+    rootwar = os.path.join(self.builddir, 'root.war')
     p1 = subprocess.Popen(["rpm2cpio", os.path.join(self.pkgdir, javarpm) ], stdout=subprocess.PIPE)
-    p2 = subprocess.Popen(['cpio', '-idm', './var/lib/eucalyptus/webapps/root.war' ], 
-                          stdin=p1.stdout, cwd=tmplogo)
+    p2 = subprocess.Popen(['cpio', '-i', '--to-stdout', 
+                           './var/lib/eucalyptus/webapps/root.war' ], 
+                          stdin=p1.stdout, stdout=open(rootwar, 'w'), cwd=self.builddir)
     p1.stdout.close()
     p2.wait()
-    subprocess.call(['unzip', './var/lib/eucalyptus/webapps/root.war'], 
-                      stdout=self.cmdout, stderr=self.cmdout, cwd=tmplogo)
+    subprocess.call(['unzip', '-j', rootwar,
+                     'themes/eucalyptus/logo.png'], 
+                      stdout=self.cmdout, stderr=self.cmdout, cwd=self.builddir)
 
+    subprocess.call(['convert', os.path.join(self.builddir, 'logo.png'), 
+                     '-resize', '250%', tmplogo])
+
+    return tmplogo
+   
+  def createBootLogo(self):
+    self.logger.info("Creating boot logo")
     # It would be nice to do all of the ImageMagick stuff with PIL, but I don't know how.
     os.environ['ELVERSION'] = self.distroversion
     os.environ['BUILDDIR'] = self.builddir
+    os.environ['LOGOFILE'] = self.getLogo()
+
+    tmplogodir = os.path.join(self.builddir, 'tmplogo')
+    mkdir(tmplogodir)
     retcode = subprocess.call([os.path.join(self.basedir, 'scripts', 'create_silvereye_boot_logo.sh')], 
-                      stdout=self.cmdout, stderr=self.cmdout, cwd=tmplogo)
-    shutil.rmtree(tmplogo)
+                      stdout=self.cmdout, stderr=self.cmdout, cwd=tmplogodir)
+    shutil.rmtree(tmplogodir)
 
   # Replace the boot menu
   def createBootMenu(self):
