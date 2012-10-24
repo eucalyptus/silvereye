@@ -68,7 +68,6 @@ class InstallClass(installclass.BaseInstallClass):
         installclass.BaseInstallClass.setSteps(self, anaconda)
         # Unskip memcheck
         anaconda.dispatch.skipStep("memcheck", skip = 0)
-        anaconda.dispatch.skipStep("betanag",permanent=1)
         anaconda.dispatch.skipStep("tasksel",permanent=1)
         anaconda.dispatch.skipStep("firewall")
         anaconda.dispatch.skipStep("group-selection")

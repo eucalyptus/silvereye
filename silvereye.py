@@ -27,6 +27,7 @@
 # present on the system this script will install/create them.
 
 import argparse
+import cookielib
 import glob
 import gzip
 import logging
@@ -37,6 +38,7 @@ import subprocess
 import sys
 from tempfile import mkstemp, mkdtemp
 import time
+from urllib import urlencode
 import urllib2
 import yum
 
@@ -127,6 +129,8 @@ class SilvereyeCLI():
                         help='URL from which to download the kexec loader kernel')
     parser.add_argument('--kexec-initramfs-url',
                         help='URL from which to download the kexec loader initramfs')
+    parser.add_argument('--release', action="store_true",
+                        help='Indicates that this is an official product release')
     self.parser = parser
 
   def run(self):
@@ -136,7 +140,8 @@ class SilvereyeCLI():
     for attr in [ 'builddir', 'distroname', 'distroversion',
                   'eucaversion', 'isofile', 'updatesurl',
                   'cachedir', 'verbose', 'quiet', 'noclean',
-                  'kexec_kernel_url', 'kexec_initramfs_url'
+                  'kexec_kernel_url', 'kexec_initramfs_url',
+                  'release'
                 ]:
       value = getattr(parsedargs, attr)
       if value is not None:
@@ -161,6 +166,7 @@ class SilvereyeCLI():
     builder.setupRequiredRepos(repoMap=repoMap)
     builder.downloadPackages()
     builder.makeUpdatesImg()
+    builder.makeProductImg()
     builder.createRepo()
     builder.createBootLogo()
     builder.createBootMenu()
@@ -221,6 +227,8 @@ class SilvereyeBuilder(yum.YumBase):
                                    'https://raw.github.com/monolive/euca-single-kernel/master/examples/vmlinuz')
     self.kexec_initramfs = kwargs.get('kexec_initramfs_url',
                                       'https://raw.github.com/monolive/euca-single-kernel/master/examples/initrd-kexec_load')
+
+    self.release = kwargs.get('release', False)
 
   @property 
   def pkgdir(self):
@@ -550,7 +558,7 @@ class SilvereyeBuilder(yum.YumBase):
                  'authconfig', 'fuse-libs', 'gpm', 'libsysfs', 'mdadm',
                  'ntp', 'postgresql-libs', 'prelink', 'setools',
                  'system-config-network-tui', 'tzdata', 'tzdata-java',
-                 'udftools', 'unzip', 'wireless-tools',
+                 'udftools', 'unzip', 'wireless-tools', 'livecd-tools',
                  'eucalyptus', 'eucalyptus-admin-tools', 'eucalyptus-cc',
                  'eucalyptus-cloud', 'eucalyptus-common-java',
                  'eucalyptus-gl', 'eucalyptus-nc', 'eucalyptus-sc',
@@ -630,6 +638,31 @@ class SilvereyeBuilder(yum.YumBase):
     if os.path.exists(tmplogo):
       return tmplogo
 
+    if self.release:
+      cookieJar = cookielib.LWPCookieJar()
+      user, password = self.getWikiCreds()
+      txdata = urlencode(dict([('u', user), ('p', password),
+                               ('id', 'start'), ('do', 'login'),
+                              ]))
+      txheaders = { 'User-agent' : 'Mozilla/4.0 (compatible; Silvereye 3; Linux)'}
+      opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookieJar))
+      req = urllib2.Request('https://wiki.eucalyptus-systems.com/doku.php' , txdata, txheaders)
+      handle = opener.open(req)
+      data = handle.read()
+      logo_url='https://wiki.eucalyptus-systems.com/lib/exe/fetch.php?cache=&media=silvereye-logo.png'
+      handle = opener.open(logo_url)
+      open(tmplogo, 'w').write(handle.read())
+    else:
+      # AgI logo (CC BY-SA 3.0) via Activism1234 on Wikipedia
+      chunked_download(urllib2.Request('http://upload.wikimedia.org/wikipedia/commons/f/f5/Silver_Iodide_Balls_and_Sticks.png', None, { 'User-agent' : 'Mozilla/4.0 (compatible; Silvereye 3; Linux)'}),
+                      os.path.join(self.builddir, 'logo.png'))
+      subprocess.call(['convert', os.path.join(self.builddir, 'logo.png'),
+                       '-transparent', 'white', tmplogo])
+
+    '''
+    # This code extracts the logo from our web UI.  It looks bad at this size,
+    # and the image is a trademark.
+
     javarpm = glob.glob(os.path.join(self.pkgdir, 'eucalyptus-common-java-3*'))[0]
 
     rootwar = os.path.join(self.builddir, 'root.war')
@@ -645,8 +678,19 @@ class SilvereyeBuilder(yum.YumBase):
 
     subprocess.call(['convert', os.path.join(self.builddir, 'logo.png'), 
                      '-resize', '250%', tmplogo])
+    '''
 
     return tmplogo
+
+  def getWikiCreds(self):
+    import getpass
+    user = getpass.getuser()
+    prompt = 'Dokuwiki username [%s]: ' % user
+    newuser = raw_input(prompt)
+    if len(newuser):
+      user = newuser
+    password = getpass.getpass('DokuWiki password: ')
+    return (user, password)
    
   def createBootLogo(self):
     self.logger.info("Creating boot logo")
@@ -674,6 +718,39 @@ class SilvereyeBuilder(yum.YumBase):
         newcfg.write(re.sub(r'(.*append initrd=.*)', 
                             r'\1 debug=1 updates=%s' % self.updatesurl, x))
       newcfg.close()
+
+  def makeProductImg(self):
+    productdir = os.path.join(self.builddir, 'product')
+    productimg = os.path.join(self.imgdir, 'images', 'product.img')
+
+    mkdir(productdir)
+    if os.geteuid() != 0:
+      self.logger.warning("Not running as root; attempting to use sudo for mount/umount")
+      sudo = ['sudo']
+
+    imgfile = open(productimg, 'w')
+    imgfile.seek(128 * 1024)
+    imgfile.write('\0')
+    imgfile.close()
+
+    subprocess.call(["/sbin/mkfs.ext2", "-F", "-L", "product", productimg],
+                    stdout=self.cmdout, stderr=self.cmdout)
+    subprocess.call(sudo + [ "/bin/mount", "-o", "loop", productimg, productdir ],
+                    stdout=self.cmdout, stderr=self.cmdout)
+    os.chmod(productdir, 0777)
+
+    buildstamp = open(os.path.join(productdir, '.buildstamp'), 'w')
+    buildstamp.write("""%s.%s
+Eucalyptus
+%s
+final=%s
+http://eucalyptus.atlassian.net/
+""" % (time.strftime('%y%m%d%H%M', time.localtime()), self.conf.yumvar['basearch'], 
+       self.eucaversion, (self.release and "yes" or "no") ))
+    buildstamp.close()
+
+    subprocess.call(sudo + [ "/bin/umount", productimg ],
+                    stdout=self.cmdout, stderr=self.cmdout)
 
   # Create the .iso image
   def createISO(self):
