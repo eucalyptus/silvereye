@@ -21,22 +21,20 @@ from product import *
 from flags import flags
 import os
 import re
+import shutil
 import types
 
 class InstallClass(silvereye.InstallClass):
     # name has underscore used for mnemonics, strip if you dont need it
-    id = "silvereyefrontend"
-    name = N_("Silvereye Eucalyptus Front End Installer")
+    id = "silvereyefrontendparent"
+    name = N_("Silvereye Eucalyptus Front End Installer Parent")
     _description = N_("The default installation of %s is a 'Cloud in a Box'"
                       "install. You can optionally select a different set of"
                       "software now.")
     _descriptionFields = (productName,)
     sortPriority = 10999
 
-    if flags.cmdline.has_key('frontend'):
-      hidden = 0
-    else:
-      hidden = 1
+    hidden = 1
 
     bootloaderTimeoutDefault = 5
     bootloaderExtraArgs = ["crashkernel=auto"]
@@ -67,6 +65,48 @@ class InstallClass(silvereye.InstallClass):
 
     def setSteps(self, anaconda):
         silvereye.InstallClass.setSteps(self, anaconda)
+
+    def postAction(self, anaconda):
+        silvereye.InstallClass.postAction(self, anaconda)
+        # XXX: use proper constants for path names
+        shutil.copyfile('/mnt/source/scripts/eucalyptus-frontend-config.sh',
+                        '/mnt/sysimage/usr/local/sbin/eucalyptus-frontend-config.sh')
+        os.chmod('/mnt/sysimage/usr/local/sbin/eucalyptus-frontend-config.sh', 0770)
+        shutil.copyfile('/mnt/source/scripts/eucalyptus-create-emi.sh',
+                        '/mnt/sysimage/usr/local/sbin/eucalyptus-create-emi.sh')
+        os.chmod('/mnt/sysimage/usr/local/sbin/eucalyptus-create-emi.sh', 0770)
+        postscriptlines ="""# Disable SELinux
+sed -i -e 's/SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config
+
+# Set the default Eucalyptus networking mode
+sed -i -e 's/^VNET_MODE=\"SYSTEM\"/VNET_MODE=\"MANAGED-NOVLAN"/' /etc/eucalyptus/eucalyptus.conf
+
+# Disable Eucalyptus services before first boot
+/sbin/chkconfig eucalyptus-cloud off
+/sbin/chkconfig eucalyptus-cc off
+
+# Create a backup copy of root's .bash_profile
+/bin/cp -a /root/.bash_profile /root/.bash_profile.orig
+
+# Create a backup of /etc/rc.d/rc.local
+cp /etc/rc.d/rc.local /etc/rc.d/rc.local.orig
+cat >> /etc/rc.d/rc.local <<"EOF"
+
+# Add eucalyptus-frontend-config.sh script to root's .bash_profile, and have
+# the original .bash_profile moved in on the first run
+echo '/bin/cp -af /root/.bash_profile.orig /root/.bash_profile' >> /root/.bash_profile
+echo '/usr/local/sbin/eucalyptus-frontend-config.sh' >> /root/.bash_profile
+
+# Replace /etc/rc.d/rc.local with the original backup copy
+rm -f /etc/rc.d/rc.local
+cp /etc/rc.d/rc.local.orig /etc/rc.d/rc.local
+EOF
+"""
+        postscript = AnacondaKSScript(postscriptlines,
+                                      inChroot=True,
+                                      logfile='/root/frontend-ks-post.log',
+                                      type=KS_SCRIPT_POST)
+        postscript.run(anaconda.rootPath, flags.serial, anaconda.intf)
 
     def __init__(self):
         silvereye.InstallClass.__init__(self)

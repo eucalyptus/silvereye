@@ -79,5 +79,8 @@ class InstallClass(installclass.BaseInstallClass):
         else:
             return yuminstall.YumBackend
 
+    def postAction(self, anaconda):
+        installclass.BaseInstallClass.postAction(self, anaconda)
+
     def __init__(self):
         installclass.BaseInstallClass.__init__(self)

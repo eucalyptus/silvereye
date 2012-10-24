@@ -112,9 +112,9 @@ installSteps = [
     ("writeksconfig", writeKSConfiguration, ),
     ("setfilecon", setFileCons, ),
     ("copylogs", copyAnacondaLogs, ),
-    ("methodcomplete", doMethodComplete, ),
     ("postscripts", runPostScripts, ),
     ("dopostaction", doPostAction, ),
+    ("methodcomplete", doMethodComplete, ),
     ("complete", ),
     ]
 

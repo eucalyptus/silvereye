@@ -20,8 +20,10 @@ from constants import *
 from product import *
 from flags import flags
 import os
+import shutil
 import re
 import types
+from kickstart import AnacondaKSScript 
 
 class InstallClass(silvereye.InstallClass):
     # name has underscore used for mnemonics, strip if you dont need it
@@ -54,6 +56,53 @@ class InstallClass(silvereye.InstallClass):
     def setSteps(self, anaconda):
         silvereye.InstallClass.setSteps(self, anaconda)
         anaconda.dispatch.skipStep("vtcheck", skip = 0)
+
+    def postAction(self, anaconda):
+        silvereye.InstallClass.postAction(self, anaconda)
+        # XXX: use proper constants for path names
+        shutil.copyfile('/mnt/source/scripts/eucalyptus-nc-config.sh',
+                        '/mnt/sysimage/usr/local/sbin/eucalyptus-nc-config.sh')
+        os.chmod('/mnt/sysimage/usr/local/sbin/eucalyptus-nc-config.sh', 0770)
+        postscriptlines = """# Disable SELinux
+sed -i -e 's/SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config
+
+# Workaround for grub not getting installed correctly on software RAID /boot
+# partitions
+rpm -q kernel-xen > /dev/null
+if [ $? -eq 0 ] ; then
+  if mount | grep -E '^/dev/md.*/boot' > /dev/null ; then
+    grub-install $(mount | grep -E '^/dev/md.*/boot'|awk '{print $1}')
+  fi
+fi
+
+# Set the default Eucalyptus networking mode
+sed -i -e 's/^VNET_MODE=\"SYSTEM\"/VNET_MODE=\"MANAGED-NOVLAN"/' /etc/eucalyptus/eucalyptus.conf
+
+# Disable Eucalyptus services before first boot
+/sbin/chkconfig eucalyptus-nc off
+
+# Create a backup copy of root's .bash_profile
+/bin/cp -a /root/.bash_profile /root/.bash_profile.orig
+
+# Create a backup of /etc/rc.d/rc.local
+cp /etc/rc.d/rc.local /etc/rc.d/rc.local.orig
+cat >> /etc/rc.d/rc.local <<"EOF"
+
+# Add eucalyptus-nc-config.sh script to root's .bash_profile, and have the
+# original .bash_profile moved in on the first run
+echo '/bin/cp -af /root/.bash_profile.orig /root/.bash_profile' >> /root/.bash_profile
+echo '/usr/local/sbin/eucalyptus-nc-config.sh' >> /root/.bash_profile
+
+# Replace /etc/rc.d/rc.local with the original backup copy
+rm -f /etc/rc.d/rc.local
+cp /etc/rc.d/rc.local.orig /etc/rc.d/rc.local
+EOF
+"""
+        postscript = AnacondaKSScript(postscriptlines,
+                                      inChroot=True,
+                                      logfile='/root/nc-ks-post.log',
+                                      type=KS_SCRIPT_POST)
+        postscript.run(anaconda.rootPath, flags.serial, anaconda.intf)
 
     def __init__(self):
         silvereye.InstallClass.__init__(self)

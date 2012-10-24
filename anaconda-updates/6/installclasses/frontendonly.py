@@ -1,5 +1,5 @@
 #
-# silverye.py
+# frontend.py
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,18 +22,18 @@ from flags import flags
 import os
 import re
 import types
-import iutil
 
 class InstallClass(frontend.InstallClass):
     # name has underscore used for mnemonics, strip if you dont need it
-    id = "cloudinabox"
-    name = N_("Silvereye Eucalyptus Cloud-in-a-box Installer")
+    id = "silvereyefrontendonly"
+    name = N_("Silvereye Eucalyptus Front End Installer")
     _description = N_("The default installation of %s is a 'Cloud in a Box'"
                       "install. You can optionally select a different set of"
                       "software now.")
     _descriptionFields = (productName,)
-    sortPriority = 10099
-    if flags.cmdline.has_key('ciab'):
+    sortPriority = 10999
+
+    if flags.cmdline.has_key('frontend'):
       hidden = 0
     else:
       hidden = 1
@@ -41,30 +41,9 @@ class InstallClass(frontend.InstallClass):
     bootloaderTimeoutDefault = 5
     bootloaderExtraArgs = ["crashkernel=auto"]
 
-    tasks = [(N_("Eucalyptus Cloud in a Box"),
+    tasks = [(N_("Eucalyptus Front-end Only"),
               ["core", "eucalyptus-cloud-controller",
                "eucalyptus-storage-controller", "eucalyptus-walrus",
-               "eucalyptus-cluster-controller", "eucalyptus-node-controller"]),
+               "eucalyptus-cluster-controller"]),
               ]
  
-    def setGroupSelection(self, anaconda):
-        frontend.InstallClass.setGroupSelection(self, anaconda)
-        anaconda.backend.selectGroup("eucalyptus-node-controller")
-
-    def setInstallData(self, anaconda):
-        frontend.InstallClass.setInstallData(self, anaconda)
-        anaconda.id.firewall.portlist.extend([ '8775:tcp' ])
-
-    def setSteps(self, anaconda):
-        frontend.InstallClass.setSteps(self, anaconda)
-        anaconda.dispatch.skipStep("vtcheck", skip = 0)
-
-    def postAction(self, anaconda):
-        frontend.InstallClass.postAction(self, anaconda)
-        messages = "/dev/null"
-        iutil.execWithRedirect("/bin/chkconfig", ["eucalyptus-nc", "off" ],
-                                    stdin = messages, stdout = messages, stderr = messages,
-                                    root = anaconda.rootPath)
- 
-    def __init__(self):
-        frontend.InstallClass.__init__(self)
