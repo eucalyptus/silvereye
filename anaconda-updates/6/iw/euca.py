@@ -53,3 +53,30 @@ def memCheck(anaconda):
         else:
             break
 
+def vtCheck(anaconda):
+    cpuinfo = open('/proc/cpuinfo', 'r')
+    vtflagsRE = re.compile('flags:.*(vmx|svm).*')
+    for line in cpuinfo.readlines():
+        if vtflagsRE.match(line):
+            return
+  
+    while 1:
+        rc = anaconda.intf.messageWindow( _("Warning! Virtualization not supported"),
+                                      _("It appears that this system's CPUs do not "
+                                        "support virtualization.  The Eucalyptus "
+                                        "Node Controller will not function properly."),
+                                   type="custom", custom_icon="warning",
+                                   custom_buttons=[_("_Exit"), _("_Install anyway")])
+        if not rc:
+            msg =  _("Your system will now be rebooted...")
+            buttons = [_("_Back"), _("_Reboot")]
+            rc = anaconda.intf.messageWindow( _("Warning! Virtualization not supported"),
+                                     msg,
+                                     type="custom", custom_icon="warning",
+                                     custom_buttons=buttons)
+            if rc:
+                sys.exit(0)
+        else:
+            break
+
+   

@@ -53,6 +53,7 @@ class InstallClass(silvereye.InstallClass):
 
     def setSteps(self, anaconda):
         silvereye.InstallClass.setSteps(self, anaconda)
+        anaconda.dispatch.skipStep("vtcheck", skip = 0)
 
     def __init__(self):
         silvereye.InstallClass.__init__(self)

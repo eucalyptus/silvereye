@@ -40,7 +40,7 @@ from upgrade import upgradeSwapSuggestion, upgradeMigrateFind
 from upgrade import findRootParts, queryUpgradeContinue
 from installmethod import doMethodComplete
 from kickstart import runPostScripts
-from euca import memCheck
+from euca import memCheck, vtCheck
 
 from backend import doPostSelection, doBackendSetup, doBasePackageSelect
 from backend import doPreInstall, doPostInstall, doInstall
@@ -70,6 +70,7 @@ installSteps = [
     ("language", ),
     ("keyboard", ),
     ("memcheck", memCheck, ),
+    ("vtcheck", vtCheck, ),
     ("betanag", betaNagScreen, ),
     ("filtertype", ),
     ("filter", ),
