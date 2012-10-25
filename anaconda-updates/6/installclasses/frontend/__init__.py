@@ -17,6 +17,7 @@
 
 import silvereye
 from constants import *
+from pykickstart.constants import *
 from product import *
 from flags import flags
 import os
@@ -54,6 +55,7 @@ class InstallClass(silvereye.InstallClass):
 
     def setInstallData(self, anaconda):
         silvereye.InstallClass.setInstallData(self, anaconda)
+        anaconda.id.security.setSELinux(SELINUX_PERMISSIVE)
         anaconda.id.firewall.portlist.extend([ '53:tcp',
                                                '53:udp',
                                                '67:udp',
@@ -75,9 +77,7 @@ class InstallClass(silvereye.InstallClass):
         shutil.copyfile('/mnt/source/scripts/eucalyptus-create-emi.sh',
                         '/mnt/sysimage/usr/local/sbin/eucalyptus-create-emi.sh')
         os.chmod('/mnt/sysimage/usr/local/sbin/eucalyptus-create-emi.sh', 0770)
-        postscriptlines ="""# Disable SELinux
-sed -i -e 's/SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config
-
+        postscriptlines ="""
 # Set the default Eucalyptus networking mode
 sed -i -e 's/^VNET_MODE=\"SYSTEM\"/VNET_MODE=\"MANAGED-NOVLAN"/' /etc/eucalyptus/eucalyptus.conf
 

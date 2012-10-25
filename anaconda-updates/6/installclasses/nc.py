@@ -17,6 +17,7 @@
 
 import silvereye
 from constants import *
+from pykickstart.constants import *
 from product import *
 from flags import flags
 import os
@@ -51,6 +52,7 @@ class InstallClass(silvereye.InstallClass):
 
     def setInstallData(self, anaconda):
         silvereye.InstallClass.setInstallData(self, anaconda)
+        anaconda.id.security.setSELinux(SELINUX_PERMISSIVE)
         anaconda.id.firewall.portlist.extend([ '8775:tcp'])
 
     def setSteps(self, anaconda):
@@ -63,9 +65,7 @@ class InstallClass(silvereye.InstallClass):
         shutil.copyfile('/mnt/source/scripts/eucalyptus-nc-config.sh',
                         '/mnt/sysimage/usr/local/sbin/eucalyptus-nc-config.sh')
         os.chmod('/mnt/sysimage/usr/local/sbin/eucalyptus-nc-config.sh', 0770)
-        postscriptlines = """# Disable SELinux
-sed -i -e 's/SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config
-
+        postscriptlines = """
 # Workaround for grub not getting installed correctly on software RAID /boot
 # partitions
 rpm -q kernel-xen > /dev/null
