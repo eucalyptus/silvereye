@@ -77,6 +77,7 @@ installSteps = [
     ("storageinit", storageInitialize, ),
     ("findrootparts", findRootParts, ),
     ("findinstall", ),
+    ("frontend", ),
     ("network", ),
     ("timezone", ),
     ("accounts", ),

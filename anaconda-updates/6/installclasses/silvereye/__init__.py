@@ -17,6 +17,7 @@
 
 import installclass
 from constants import *
+from pykickstart.constants import *
 from product import *
 from flags import flags
 import os
@@ -63,6 +64,7 @@ class InstallClass(installclass.BaseInstallClass):
         installclass.BaseInstallClass.setDefaultPartitioning(self,
                                                 anaconda.id.storage,
                                                 anaconda.platform)
+        anaconda.id.security.setSELinux(SELINUX_PERMISSIVE)
 
     def setSteps(self, anaconda):
         installclass.BaseInstallClass.setSteps(self, anaconda)

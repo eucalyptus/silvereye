@@ -17,13 +17,18 @@
 
 import silvereye
 from constants import *
-from pykickstart.constants import *
 from product import *
 from flags import flags
+import isys
 import os
 import re
 import shutil
 import types
+import urlgrabber
+from kickstart import AnacondaKSScript
+
+import gettext
+_ = lambda x: gettext.ldgettext("anaconda", x)
 
 class InstallClass(silvereye.InstallClass):
     # name has underscore used for mnemonics, strip if you dont need it
@@ -52,10 +57,11 @@ class InstallClass(silvereye.InstallClass):
                       ["core", "eucalyptus-cloud-controller",
                        "eucalyptus-storage-controller", "eucalyptus-walrus",
                        "eucalyptus-cluster-controller"])
+        anaconda.backend.selectPackage("unzip")
+        anaconda.backend.selectPackage("livecd-tools")
 
     def setInstallData(self, anaconda):
         silvereye.InstallClass.setInstallData(self, anaconda)
-        anaconda.id.security.setSELinux(SELINUX_PERMISSIVE)
         anaconda.id.firewall.portlist.extend([ '53:tcp',
                                                '53:udp',
                                                '67:udp',
@@ -65,48 +71,87 @@ class InstallClass(silvereye.InstallClass):
                                                '8773:tcp',
                                                '8774:tcp'])
 
+        if flags.cmdline.has_key("eucaconf"):
+            try:
+                f = urlgrabber.urlopen(flags.cmdline["eucaconf"])
+                eucaconf = open('/tmp/eucalyptus.conf', 'w')
+                eucaconf.write(f.read())
+                f.close()
+                eucaconf.close()
+            except urlgrabber.grabber.URLGrabError as e:
+                if anaconda.intf:
+                    rc = anaconda.intf.messageWindow( _("Warning! eucalyptus.conf download failed"),
+                                                      _("The following error was encountered while"
+                                                        " downloading the eucalyptus.conf file:\n\n%s" % e),
+                                   type="custom", custom_icon="warning",
+                                   custom_buttons=[_("_Exit"), _("_Install anyway")])
+                    if not rc:
+                        sys.exit(0)
+                else:
+                    sys.exit(0)
+        else:
+            pass
+
     def setSteps(self, anaconda):
         silvereye.InstallClass.setSteps(self, anaconda)
+        anaconda.dispatch.skipStep("frontend", skip = 0)
 
     def postAction(self, anaconda):
         silvereye.InstallClass.postAction(self, anaconda)
         # XXX: use proper constants for path names
-        shutil.copyfile('/mnt/source/scripts/eucalyptus-frontend-config.sh',
+        shutil.copyfile('/tmp/updates/scripts/eucalyptus-frontend-config.sh',
                         '/mnt/sysimage/usr/local/sbin/eucalyptus-frontend-config.sh')
         os.chmod('/mnt/sysimage/usr/local/sbin/eucalyptus-frontend-config.sh', 0770)
-        shutil.copyfile('/mnt/source/scripts/eucalyptus-create-emi.sh',
-                        '/mnt/sysimage/usr/local/sbin/eucalyptus-create-emi.sh')
-        os.chmod('/mnt/sysimage/usr/local/sbin/eucalyptus-create-emi.sh', 0770)
+
+        # EKI
+        shutil.copyfile('/tmp/updates/scripts/vmlinuz-kexec',
+                        '/mnt/sysimage/tmp/vmlinuz-kexec')
+
+        # ERI
+        shutil.copyfile('/tmp/updates/scripts/initramfs-kexec',
+                        '/mnt/sysimage/tmp/initramfs-kexec')
+
+        # Image kickstart
+        newks = open('/mnt/sysimage/tmp/ks-centos6.cfg', 'w')
+        ayum = anaconda.backend.ayum
+
+        for repo in ayum.repos.listEnabled():
+            newks.write('repo --name=%s --baseurl=%s\n' % (repo.name, repo.baseurl[0]))
+        for line in open('/tmp/updates/ks-centos6.cfg', 'r').readlines():
+            if line.startswith('repo '):
+                continue
+            newks.write(line)
+        newks.close()
+
+        # Image creation script
+        shutil.copyfile('/tmp/updates/ami_creator.py',
+                        '/mnt/sysimage/tmp/ami_creator.py')
+        os.chmod('/mnt/sysimage/tmp/ami_creator.py', 0770)
+
+        # XXX clean this up
+        bindmount = False
+        if ayum._baseRepoURL and ayum._baseRepoURL.startswith("file://"):
+            os.mkdir('/mnt/sysimage/mnt/source')
+            isys.mount('/mnt/source', '/mnt/sysimage/mnt/source', bindMount=True)
+            bindmount = True
+
+        # eucalyptus.conf fragment from config screen
+        w = anaconda.intf.waitWindow(_("Creating EMI"), _("Creating an initial CentOS 6 EMI."))
+        shutil.copyfile('/tmp/eucalyptus.conf',
+                        '/mnt/sysimage/etc/eucalyptus/eucalyptus.conf.anaconda')
         postscriptlines ="""
-# Set the default Eucalyptus networking mode
-sed -i -e 's/^VNET_MODE=\"SYSTEM\"/VNET_MODE=\"MANAGED-NOVLAN"/' /etc/eucalyptus/eucalyptus.conf
-
-# Disable Eucalyptus services before first boot
-/sbin/chkconfig eucalyptus-cloud off
-/sbin/chkconfig eucalyptus-cc off
-
-# Create a backup copy of root's .bash_profile
-/bin/cp -a /root/.bash_profile /root/.bash_profile.orig
-
-# Create a backup of /etc/rc.d/rc.local
-cp /etc/rc.d/rc.local /etc/rc.d/rc.local.orig
-cat >> /etc/rc.d/rc.local <<"EOF"
-
-# Add eucalyptus-frontend-config.sh script to root's .bash_profile, and have
-# the original .bash_profile moved in on the first run
-echo '/bin/cp -af /root/.bash_profile.orig /root/.bash_profile' >> /root/.bash_profile
-echo '/usr/local/sbin/eucalyptus-frontend-config.sh' >> /root/.bash_profile
-
-# Replace /etc/rc.d/rc.local with the original backup copy
-rm -f /etc/rc.d/rc.local
-cp /etc/rc.d/rc.local.orig /etc/rc.d/rc.local
-EOF
+/usr/sbin/euca_conf --upgrade-conf /etc/eucalyptus/eucalyptus.conf.anaconda
+/tmp/ami_creator.py -m -c /tmp/ks-centos6.cfg 
 """
         postscript = AnacondaKSScript(postscriptlines,
                                       inChroot=True,
                                       logfile='/root/frontend-ks-post.log',
                                       type=KS_SCRIPT_POST)
         postscript.run(anaconda.rootPath, flags.serial, anaconda.intf)
+
+        if bindmount:
+            isys.umount('/mnt/sysimage/mnt/source')
+        w.pop()
 
     def __init__(self):
         silvereye.InstallClass.__init__(self)

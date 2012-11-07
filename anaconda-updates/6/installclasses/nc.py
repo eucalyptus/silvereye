@@ -17,7 +17,6 @@
 
 import silvereye
 from constants import *
-from pykickstart.constants import *
 from product import *
 from flags import flags
 import os
@@ -52,7 +51,6 @@ class InstallClass(silvereye.InstallClass):
 
     def setInstallData(self, anaconda):
         silvereye.InstallClass.setInstallData(self, anaconda)
-        anaconda.id.security.setSELinux(SELINUX_PERMISSIVE)
         anaconda.id.firewall.portlist.extend([ '8775:tcp'])
 
     def setSteps(self, anaconda):
@@ -62,19 +60,10 @@ class InstallClass(silvereye.InstallClass):
     def postAction(self, anaconda):
         silvereye.InstallClass.postAction(self, anaconda)
         # XXX: use proper constants for path names
-        shutil.copyfile('/mnt/source/scripts/eucalyptus-nc-config.sh',
+        shutil.copyfile('/tmp/updates/scripts/eucalyptus-nc-config.sh',
                         '/mnt/sysimage/usr/local/sbin/eucalyptus-nc-config.sh')
         os.chmod('/mnt/sysimage/usr/local/sbin/eucalyptus-nc-config.sh', 0770)
         postscriptlines = """
-# Workaround for grub not getting installed correctly on software RAID /boot
-# partitions
-rpm -q kernel-xen > /dev/null
-if [ $? -eq 0 ] ; then
-  if mount | grep -E '^/dev/md.*/boot' > /dev/null ; then
-    grub-install $(mount | grep -E '^/dev/md.*/boot'|awk '{print $1}')
-  fi
-fi
-
 # Set the default Eucalyptus networking mode
 sed -i -e 's/^VNET_MODE=\"SYSTEM\"/VNET_MODE=\"MANAGED-NOVLAN"/' /etc/eucalyptus/eucalyptus.conf
 

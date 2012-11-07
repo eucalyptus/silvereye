@@ -62,7 +62,7 @@ class InstallClass(frontend.InstallClass):
     def postAction(self, anaconda):
         frontend.InstallClass.postAction(self, anaconda)
         messages = "/dev/null"
-        iutil.execWithRedirect("/bin/chkconfig", ["eucalyptus-nc", "off" ],
+        iutil.execWithRedirect("/sbin/chkconfig", ["eucalyptus-nc", "off" ],
                                     stdin = messages, stdout = messages, stderr = messages,
                                     root = anaconda.rootPath)
  

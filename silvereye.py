@@ -162,7 +162,6 @@ class SilvereyeCLI():
     builder.getImageFiles()
     builder.getKexecFiles()
     builder.createKickstartFiles()
-    builder.copyConfigScripts()
     builder.setupRequiredRepos(repoMap=repoMap)
     builder.downloadPackages()
     builder.makeUpdatesImg()
@@ -413,7 +412,9 @@ class SilvereyeBuilder(yum.YumBase):
       shutil.copytree(os.path.join(self.basedir, 'anaconda-updates', self.distroversion), updatesdir)
       pixmapDir = os.path.join(updatesdir, 'pixmaps')
       shutil.copyfile(self.getLogo(), os.path.join(pixmapDir, 'splash.png'))
-      os.link(os.path.join(pixmapDir, 'splash.png'), os.path.join(pixmapDir, 'progress_first.png'))
+      if not os.path.exists(os.path.join(pixmapDir, 'progress_first.png')):
+          os.link(os.path.join(pixmapDir, 'splash.png'),
+                  os.path.join(pixmapDir, 'progress_first.png'))
 
       # TODO: Remove this, I think, because we no longer rely on kickstart for EL6
       f = open('/usr/lib/anaconda/kickstart.py', 'r')
@@ -454,13 +455,6 @@ class SilvereyeBuilder(yum.YumBase):
         #  dest.write("eucalyptus-release-nightly\n")
         #  continue
         dest.write(line)
-
-  def copyConfigScripts(self):
-    for script in [ 'eucalyptus-frontend-config.sh',
-                    'eucalyptus-nc-config.sh',
-                    'eucalyptus-create-emi.sh' ]:
-      shutil.copyfile(os.path.join(self.basedir, 'scripts', script),
-                      os.path.join(self.imgdir, 'scripts', script))
 
   def getKexecFiles(self):
     urlRE = re.compile(r'(https?|ftp)://')
