@@ -85,5 +85,17 @@ class InstallClass(installclass.BaseInstallClass):
     def postAction(self, anaconda):
         installclass.BaseInstallClass.postAction(self, anaconda)
 
+        postscriptlines ="""
+if [ -e /etc/libvirt/qemu/networks/autostart/default.xml ]; then
+  rm -f /etc/libvirt/qemu/networks/autostart/default.xml
+fi
+"""
+        postscript = AnacondaKSScript(postscriptlines,
+                                      inChroot=True,
+                                      logfile='/root/euca-common-ks-post.log',
+                                      type=KS_SCRIPT_POST)
+        postscript.run(anaconda.rootPath, flags.serial, anaconda.intf)
+
+
     def __init__(self):
         installclass.BaseInstallClass.__init__(self)
