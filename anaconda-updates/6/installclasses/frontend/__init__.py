@@ -60,6 +60,10 @@ class InstallClass(silvereye.InstallClass):
         anaconda.backend.selectPackage("unzip")
         anaconda.backend.selectPackage("livecd-tools")
 
+        # For 3.2 and later
+        anaconda.backend.selectPackage("eucalyptus-console")
+        anaconda.backend.selectPackage("eucadw")
+
     def setInstallData(self, anaconda):
         silvereye.InstallClass.setInstallData(self, anaconda)
         anaconda.id.firewall.portlist.extend([ '53:tcp',
@@ -142,6 +146,7 @@ class InstallClass(silvereye.InstallClass):
         postscriptlines ="""
 /usr/sbin/euca_conf --upgrade-conf /etc/eucalyptus/eucalyptus.conf.anaconda
 /tmp/ami_creator.py -m -c /tmp/ks-centos6.cfg 
+chkconfig dnsmasq off
 """
         postscript = AnacondaKSScript(postscriptlines,
                                       inChroot=True,

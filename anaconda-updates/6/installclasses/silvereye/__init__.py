@@ -58,6 +58,7 @@ class InstallClass(installclass.BaseInstallClass):
         for pkg in [ 'epel-release', 'elrepo-release',
                      'euca2ools-release', 'eucalyptus-release' ]:
             anaconda.backend.selectPackage(pkg)
+            anaconda.backend.selectPackage('ntp')
 
     def setInstallData(self, anaconda):
         installclass.BaseInstallClass.setInstallData(self, anaconda)
