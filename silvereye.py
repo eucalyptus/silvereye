@@ -411,6 +411,8 @@ class SilvereyeBuilder(yum.YumBase):
         shutil.rmtree(updatesdir)
       shutil.copytree(os.path.join(self.basedir, 'anaconda-updates', self.distroversion), updatesdir)
       pixmapDir = os.path.join(updatesdir, 'pixmaps')
+      if not os.path.exists(pixmapDir):
+          os.mkdir(pixmapDir)
       shutil.copyfile(self.getLogo(), os.path.join(pixmapDir, 'splash.png'))
       if not os.path.exists(os.path.join(pixmapDir, 'progress_first.png')):
           os.link(os.path.join(pixmapDir, 'splash.png'),
@@ -451,9 +453,9 @@ class SilvereyeBuilder(yum.YumBase):
             continue
           elif re.match('network .*query', line):
             continue
-        # elif eucaversion == 'nightly' and line.startswith('eucalyptus-release'):
-        #  dest.write("eucalyptus-release-nightly\n")
-        #  continue
+        # elif self.eucaversion == 'nightly' and line.startswith('eucalyptus-release'):
+        #   dest.write("eucalyptus-release-nightly\n")
+        #   continue
         dest.write(line)
 
   def getKexecFiles(self):
@@ -556,7 +558,11 @@ class SilvereyeBuilder(yum.YumBase):
                  'eucalyptus', 'eucalyptus-admin-tools', 'eucalyptus-cc',
                  'eucalyptus-cloud', 'eucalyptus-common-java',
                  'eucalyptus-gl', 'eucalyptus-nc', 'eucalyptus-sc',
-                 'eucalyptus-walrus', 'eucalyptus-release'])
+                 'eucalyptus-walrus', 'eucalyptus-release' ])
+
+    # These are specifically for the EMI
+    rpms.update(['cloud-init', 'system-config-securitylevel-tui',
+                 'system-config-firewall-base', 'acpid'])
 
     if self.eucaversion in [ 'nightly', '3.2' ]:
       rpms.update(['eucalyptus-console', 'eucadw'])
