@@ -209,6 +209,7 @@ class FrontendWindow (InstallWindow):
                    "VNET_PUBLICIPS": pubnet,
                    "VNET_ADDRSPERNET": addrspernet,
                    "VNET_MODE": "MANAGED-NOVLAN",
+                   "CREATE_SC_LOOP_DEVICES": "256",
                  }
         eucaConf = open('/tmp/eucalyptus.conf', 'w')
         eucaConf.write("\n".join([ '%s="%s"' % (x, config[x]) for x in config.keys() ]))
