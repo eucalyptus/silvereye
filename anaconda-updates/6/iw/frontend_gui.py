@@ -201,7 +201,7 @@ class FrontendWindow (InstallWindow):
         # convert to long ugly names
         # NOTE: We are hard-coding network mode
         config = {
-                   "VNET_PRIVINTERFACE": privif,
+                   "VNET_PRIVINTERFACE": "br0",
                    "VNET_SUBNET": privnet,
                    "VNET_NETMASK": privmask,
                    "VNET_DNS": privdns,
