@@ -107,13 +107,18 @@ class InstallClass(silvereye.InstallClass):
                         '/mnt/sysimage/usr/local/sbin/eucalyptus-frontend-config.sh')
         os.chmod('/mnt/sysimage/usr/local/sbin/eucalyptus-frontend-config.sh', 0770)
 
+        shutil.copyfile('/tmp/updates/scripts/install-unpacked-image.py',
+                        '/mnt/sysimage/usr/local/sbin/install-unpacked-image.py')
+        os.chmod('/mnt/sysimage/usr/local/sbin/install-unpacked-image.py', 0770)
+
+        os.mkdir('/mnt/sysimage/tmp/img')
         # EKI
         shutil.copyfile('/tmp/updates/scripts/vmlinuz-kexec',
-                        '/mnt/sysimage/tmp/vmlinuz-kexec')
+                        '/mnt/sysimage/tmp/img/vmlinuz-kexec')
 
         # ERI
         shutil.copyfile('/tmp/updates/scripts/initramfs-kexec',
-                        '/mnt/sysimage/tmp/initramfs-kexec')
+                        '/mnt/sysimage/tmp/img/initramfs-kexec')
 
         # Image kickstart
         newks = open('/mnt/sysimage/tmp/ks-centos6.cfg', 'w')
@@ -145,8 +150,10 @@ class InstallClass(silvereye.InstallClass):
                         '/mnt/sysimage/etc/eucalyptus/eucalyptus.conf.anaconda')
         postscriptlines ="""
 /usr/sbin/euca_conf --upgrade-conf /etc/eucalyptus/eucalyptus.conf.anaconda
+cd /tmp/img
 /tmp/ami_creator.py -m -c /tmp/ks-centos6.cfg 
 chkconfig dnsmasq off
+chkconfig eucalyptus-cloud off
 """
         postscript = AnacondaKSScript(postscriptlines,
                                       inChroot=True,
