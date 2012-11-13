@@ -104,12 +104,16 @@ class InstallClass(silvereye.InstallClass):
         silvereye.InstallClass.postAction(self, anaconda)
         # XXX: use proper constants for path names
         shutil.copyfile('/tmp/updates/scripts/eucalyptus-frontend-config.sh',
-                        '/mnt/sysimage/usr/local/sbin/eucalyptus-frontend-config.sh')
-        os.chmod('/mnt/sysimage/usr/local/sbin/eucalyptus-frontend-config.sh', 0770)
+                        '/mnt/sysimage/usr/local/sbin/eucalyptus-frontend-config')
+        os.chmod('/mnt/sysimage/usr/local/sbin/eucalyptus-frontend-config', 0770)
 
         shutil.copyfile('/tmp/updates/scripts/install-unpacked-image.py',
                         '/mnt/sysimage/usr/local/sbin/install-unpacked-image.py')
         os.chmod('/mnt/sysimage/usr/local/sbin/install-unpacked-image.py', 0770)
+
+        shutil.copyfile('/tmp/updates/scripts/eucalyptus-setup.init',
+                        '/mnt/sysimage/etc/init.d/eucalyptus-setup')
+        os.chmod('/mnt/sysimage/etc/init.d/eucalyptus-setup', 0770)
 
         os.mkdir('/mnt/sysimage/tmp/img')
         # EKI
@@ -154,6 +158,7 @@ cd /tmp/img
 /tmp/ami_creator.py -m -c /tmp/ks-centos6.cfg 
 chkconfig dnsmasq off
 chkconfig eucalyptus-cloud off
+chkconfig eucalyptus-setup on
 """
         postscript = AnacondaKSScript(postscriptlines,
                                       inChroot=True,
