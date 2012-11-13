@@ -1,3 +1,4 @@
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 # Software License Agreement (BSD License)
@@ -40,7 +41,6 @@ class InstallUnpackedImage(InstallImage):
     def bundleAll(self, dir, prefix, description, arch):
         self.destination = dir + '/'
         names = os.listdir(dir)
-        import pdb; pdb.set_trace()
         kernel_dir=None
         kernel_found = False
         for path in names:
