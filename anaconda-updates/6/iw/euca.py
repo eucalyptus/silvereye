@@ -55,7 +55,7 @@ def memCheck(anaconda):
 
 def vtCheck(anaconda):
     cpuinfo = open('/proc/cpuinfo', 'r')
-    vtflagsRE = re.compile('flags:.*(vmx|svm).*')
+    vtflagsRE = re.compile('flags\s*:.*(vmx|svm).*')
     for line in cpuinfo.readlines():
         if vtflagsRE.match(line):
             return
