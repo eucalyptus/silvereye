@@ -41,6 +41,8 @@ class InstallClass(frontend.InstallClass):
     bootloaderTimeoutDefault = 5
     bootloaderExtraArgs = ["crashkernel=auto"]
 
+    colocated_nc = 1
+
     tasks = [(N_("Eucalyptus Cloud in a Box"),
               ["core", "eucalyptus-cloud-controller",
                "eucalyptus-storage-controller", "eucalyptus-walrus",
@@ -61,10 +63,6 @@ class InstallClass(frontend.InstallClass):
 
     def postAction(self, anaconda):
         frontend.InstallClass.postAction(self, anaconda)
-        messages = "/dev/null"
-        iutil.execWithRedirect("/sbin/chkconfig", ["eucalyptus-nc", "off" ],
-                                    stdin = messages, stdout = messages, stderr = messages,
-                                    root = anaconda.rootPath)
- 
+
     def __init__(self):
         frontend.InstallClass.__init__(self)

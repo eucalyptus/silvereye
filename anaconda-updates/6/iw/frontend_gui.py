@@ -49,8 +49,11 @@ def checkSubnet(net, mask):
         return
 
 class FrontendWindow (InstallWindow):
+    colocated_nc = 0
+
     def getScreen(self, anaconda):
         self.intf = anaconda.intf
+        self.colocated_nc = getattr(anaconda.id.instClass, 'colocated_nc', 0)
 
         config = dict()
         configLineRE = re.compile(r'''\s*(\w+)\s*=\s*((['"])(.*)\3)''')
@@ -85,7 +88,10 @@ class FrontendWindow (InstallWindow):
             pass
 
         privif = config.get('VNET_PRIVINTERFACE', '')
-        if privif and privif in self.validDevs:
+        if self.colocated_nc:
+            self.privif.set_text("br0")
+            self.privif.set_editable(False)
+        elif privif and privif in self.validDevs:
             self.privif.set_text(privif)
         else:
             self.privif.set_text(self.validDevs[0])
@@ -106,8 +112,9 @@ class FrontendWindow (InstallWindow):
             self.privdns.set_text(' '.join(nameservers))
 
         self.addrspernet.set_text(config.get('VNET_ADDRSPERNET', ''))
-        self.privnet.set_text(config.get('VNET_SUBNET', ''))
-        self.privmask.set_text(config.get('VNET_NETMASK', ''))
+        # Set default values for private net
+        self.privnet.set_text(config.get('VNET_SUBNET', '172.31.254.0'))
+        self.privmask.set_text(config.get('VNET_NETMASK', '255.255.254.0'))
         self.pubnet.set_text(config.get('VNET_PUBLICIPS', ''))
 
         # load the icon
@@ -132,8 +139,6 @@ class FrontendWindow (InstallWindow):
         self.privnet.grab_focus()
 
     def validationError(self):
-        self.privnet.set_text("")
-        self.pubnet.set_text("")
         self.privnet.grab_focus()
         raise gui.StayOnScreen
 
@@ -150,7 +155,7 @@ class FrontendWindow (InstallWindow):
 
         errors = []
 
-        if not privif in self.validDevs:
+        if not self.colocated_nc and not privif in self.validDevs:
             errors.append("Private interface %s is not a valid device" % privif)
         if not pubif in self.validDevs:
             errors.append("Public interface %s is not a valid device" % pubif)
@@ -218,21 +223,30 @@ class FrontendWindow (InstallWindow):
         eucaConf.write("\n".join([ '%s="%s"' % (x, config[x]) for x in config.keys() ]))
         eucaConf.close()
 
-        # connect the private interface to a bridge
-        privifcfg = anaconda.id.network.netdevices[privif]
-        privifcfg.set(("NM_CONTROLLED", "no"))
-        privifcfg.set(("BRIDGE", "br0"))
-        privifcfg.set(("NOZEROCONF", "true"))
-
         bridgeifcfg = network.NetworkDevice(network.netscriptsDir, "br0")
         bridgeifcfg.set(("TYPE", "Bridge"))
         bridgeifcfg.set(("DEVICE", "br0"))
         bridgeifcfg.set(("NM_CONTROLLED", "no"))
+        bridgeifcfg.set(("DELAY", "0"))
+        bridgeifcfg.set(("ONBOOT", "yes"))
 
-        for attr in [ "BOOTPROTO", "IPADDR", "NETMASK" ]:  
-           value = privifcfg.get(attr)
-           bridgeifcfg.set((attr, value))
-           privifcfg.unset(attr)
+        if self.colocated_nc:
+            bridgeifcfg.set(("BOOTPROTO", "static"))
+            privip = privnet[:-1] + str(int(privnet[-1]) + 1)
+            bridgeifcfg.set(("IPADDR", privip))
+            bridgeifcfg.set(("NETMASK", privmask))
+            bridgeifcfg.set(("NETWORK", privnet))
+        else:
+            # connect the private interface to a bridge
+            privifcfg = anaconda.id.network.netdevices[privif]
+            privifcfg.set(("NM_CONTROLLED", "no"))
+            privifcfg.set(("BRIDGE", "br0"))
+            privifcfg.set(("NOZEROCONF", "true"))
+
+            for attr in [ "BOOTPROTO", "IPADDR", "NETMASK" ]:  
+                value = privifcfg.get(attr)
+                bridgeifcfg.set((attr, value))
+                privifcfg.unset(attr)
 
         anaconda.id.network.netdevices["br0"] = bridgeifcfg
         bridgeifcfg.write()

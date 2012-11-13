@@ -41,6 +41,7 @@ class InstallClass(installclass.BaseInstallClass):
 
     bootloaderTimeoutDefault = 5
     bootloaderExtraArgs = ["crashkernel=auto"]
+    colocated_nc = 0
 
     tasks = [(N_("Eucalyptus Cloud in a Box"),
               ["core", "eucalyptus-cloud-controller",
