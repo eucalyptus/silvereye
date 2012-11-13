@@ -185,12 +185,15 @@ class FrontendWindow (InstallWindow):
         if not privmask:
             errors.append('Private netmask must be set.')
         if not addrspernet:
-            errors.append('Addrs per new must be set.')
-        if privmask and addrspernet and getSubnetSize(privmask) < int(addrspernet):
-            errors.append("Addrs per net must be smaller than private network size.")
+            errors.append('Addrs per net must be set.')
+        try:
+            if privmask and addrspernet and getSubnetSize(privmask) < int(addrspernet):
+                errors.append("Addrs per net must be smaller than private network size.")
 
-        if addrspernet and not re.match(r'^0b10*$', bin(int(addrspernet))):
-            errors.append("Addrs per net must be an integer power of two.")
+            if addrspernet and not re.match(r'^0b10*$', bin(int(addrspernet))):
+                errors.append("Addrs per net must be an integer power of two.")
+        except ValueError:
+            errors.append('Addrs per net must be an integer')
 
         if len(errors):
             self.intf.messageWindow(_("Error with Configuration"),
