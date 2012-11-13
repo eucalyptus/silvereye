@@ -56,7 +56,8 @@ class InstallClass(silvereye.InstallClass):
         map(lambda x: anaconda.backend.selectGroup(x),
                       ["core", "eucalyptus-cloud-controller",
                        "eucalyptus-storage-controller", "eucalyptus-walrus",
-                       "eucalyptus-cluster-controller"])
+                       "eucalyptus-cluster-controller",
+                       'X Window System' 'Desktop' 'Fonts'])
         anaconda.backend.selectPackage("unzip")
         anaconda.backend.selectPackage("livecd-tools")
 

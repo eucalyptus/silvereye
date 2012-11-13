@@ -541,15 +541,12 @@ class SilvereyeBuilder(yum.YumBase):
 
   def downloadPackages(self):
     # Retrieve the RPMs for CentOS, Eucalyptus, and dependencies
-    coregroup = None
+    rpms = set()
     for groupList in self.doGroupLists():
       for x in groupList:
-        if x.name == "Core":
-          coregroup = x
-          break
-      if coregroup: break
+        if x.name in ['Core', 'X Window System' 'Desktop' 'Fonts']:
+          rpms.update(x.packages)
 
-    rpms = set(coregroup.packages)
     rpms.update(['centos-release', 'epel-release', 'euca2ools-release',
                  'authconfig', 'fuse-libs', 'gpm', 'libsysfs', 'mdadm',
                  'ntp', 'postgresql-libs', 'prelink', 'setools',
@@ -563,6 +560,9 @@ class SilvereyeBuilder(yum.YumBase):
     # These are specifically for the EMI
     rpms.update(['cloud-init', 'system-config-securitylevel-tui',
                  'system-config-firewall-base', 'acpid'])
+
+    # Add desktop bits.  Do we want a build flag to ignore this?
+    rpms.update(['firefox'])
 
     if self.eucaversion in [ 'nightly', '3.2' ]:
       rpms.update(['eucalyptus-console', 'eucadw'])
