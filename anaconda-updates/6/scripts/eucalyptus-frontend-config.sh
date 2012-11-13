@@ -187,3 +187,6 @@ configure_frontend
 # Get the cloud admin's credentials
 get_credentials
 
+install-unpacked-image.py -t /tmp/img -b centos6 -s "CentOS 6 demo" -a x86_64
+
+chkconfig eucalyptus-cloud on
