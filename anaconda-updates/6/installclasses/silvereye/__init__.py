@@ -23,6 +23,7 @@ from flags import flags
 import os
 import re
 import types
+from kickstart import AnacondaKSScript
 
 import installmethod
 import yuminstall
