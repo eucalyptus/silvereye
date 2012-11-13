@@ -161,6 +161,7 @@ CLUSTER_NAME=CLUSTER01
 # Now register clusters and SCs
 /usr/sbin/euca_conf --register-cluster --partition $CLUSTER_NAME --host $PUBLIC_IP_ADDRESS --component=cc_01 | tee -a $LOGFILE
 /usr/sbin/euca_conf --register-sc --partition $CLUSTER_NAME --host $PRIVATE_IP_ADDRESS --component=sc_01 | tee -a $LOGFILE
+euca-modify-property -p ${CLUSTER_NAME}.storage.blockstoragemanager=overlay
 
 echo "$(date)- Registered components " | tee -a $LOGFILE
 echo ""
