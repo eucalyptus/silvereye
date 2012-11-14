@@ -118,7 +118,7 @@ class FrontendWindow (InstallWindow):
         self.pubnet.set_text(config.get('VNET_PUBLICIPS', ''))
 
         # load the icon
-        gui.readImageFromFile("eucalyptus-E.png", image=self.icon)
+        gui.readImageFromFile("vendor-icon.png", image=self.icon)
 
         # connect hotkeys
         """

@@ -417,6 +417,7 @@ class SilvereyeBuilder(yum.YumBase):
       if not os.path.exists(os.path.join(pixmapDir, 'progress_first.png')):
           os.link(os.path.join(pixmapDir, 'splash.png'),
                   os.path.join(pixmapDir, 'progress_first.png'))
+      shutil.copyfile(self.getIcon(), os.path.join(pixmapDir, 'vendor-icon.png'))
 
       # TODO: Remove this, I think, because we no longer rely on kickstart for EL6
       f = open('/usr/lib/anaconda/kickstart.py', 'r')
@@ -659,28 +660,21 @@ class SilvereyeBuilder(yum.YumBase):
       subprocess.call(['convert', os.path.join(self.builddir, 'logo.png'),
                        '-transparent', 'white', tmplogo])
 
-    '''
-    # This code extracts the logo from our web UI.  It looks bad at this size,
-    # and the image is a trademark.
-
-    javarpm = glob.glob(os.path.join(self.pkgdir, 'eucalyptus-common-java-3*'))[0]
-
-    rootwar = os.path.join(self.builddir, 'root.war')
-    p1 = subprocess.Popen(["rpm2cpio", os.path.join(self.pkgdir, javarpm) ], stdout=subprocess.PIPE)
-    p2 = subprocess.Popen(['cpio', '-i', '--to-stdout', 
-                           './var/lib/eucalyptus/webapps/root.war' ], 
-                          stdin=p1.stdout, stdout=open(rootwar, 'w'), cwd=self.builddir)
-    p1.stdout.close()
-    p2.wait()
-    subprocess.call(['unzip', '-j', rootwar,
-                     'themes/eucalyptus/logo.png'], 
-                      stdout=self.cmdout, stderr=self.cmdout, cwd=self.builddir)
-
-    subprocess.call(['convert', os.path.join(self.builddir, 'logo.png'), 
-                     '-resize', '250%', tmplogo])
-    '''
-
     return tmplogo
+
+  def getIcon(self):
+    icon = os.path.join(self.builddir, 'icon.png')
+
+    if os.path.exists(icon):
+      return icon
+
+    # TODO: grab the eucalyptus "E" from somewhere
+    # if self.release:
+    # ...
+    # else:
+    logo = self.getLogo()
+    subprocess.call(['convert', '-resize', '48x45!', logo, icon)
+    return icon
 
   def getWikiCreds(self):
     import getpass
