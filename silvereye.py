@@ -545,7 +545,7 @@ class SilvereyeBuilder(yum.YumBase):
     rpms = set()
     for groupList in self.doGroupLists():
       for x in groupList:
-        if x.name in ['Core', 'X Window System' 'Desktop' 'Fonts']:
+        if x.name in ['Core', 'X Window System', 'Desktop', 'Fonts']:
           rpms.update(x.packages)
 
     rpms.update(['centos-release', 'epel-release', 'euca2ools-release',
@@ -673,7 +673,7 @@ class SilvereyeBuilder(yum.YumBase):
     # ...
     # else:
     logo = self.getLogo()
-    subprocess.call(['convert', '-resize', '48x45!', logo, icon)
+    subprocess.call(['convert', '-resize', '48x45!', logo, icon ])
     return icon
 
   def getWikiCreds(self):
