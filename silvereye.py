@@ -160,7 +160,6 @@ class SilvereyeCLI():
     builder.installBuildDeps()
     builder.getIsolinuxFiles()
     builder.getImageFiles()
-    builder.getKexecFiles()
     builder.createKickstartFiles()
     builder.setupRequiredRepos(repoMap=repoMap)
     builder.downloadPackages()
@@ -419,6 +418,13 @@ class SilvereyeBuilder(yum.YumBase):
                   os.path.join(pixmapDir, 'progress_first.png'))
       shutil.copyfile(self.getIcon(), os.path.join(pixmapDir, 'vendor-icon.png'))
 
+      # The scripts directory is really a catch-all here
+      scriptsDir = os.path.join(updatesdir, 'scripts')
+      if not os.path.exists(scriptsDir):
+          os.mkdir(scriptsDir)
+      self.getKexecFiles(scriptsDir)
+      self.getAmiCreator(updatesdir)
+
       # TODO: Remove this, I think, because we no longer rely on kickstart for EL6
       f = open('/usr/lib/anaconda/kickstart.py', 'r')
       g = open(os.path.join(updatesdir, 'kickstart.py'), 'w')
@@ -459,17 +465,21 @@ class SilvereyeBuilder(yum.YumBase):
         #   continue
         dest.write(line)
 
-  def getKexecFiles(self):
+  def getKexecFiles(self, dest):
     urlRE = re.compile(r'(https?|ftp)://')
     if urlRE.match(self.kexec_kernel):
-      chunked_download(self.kexec_kernel, os.path.join(self.imgdir, 'scripts', 'vmlinuz-kexec'))
+      chunked_download(self.kexec_kernel, os.path.join(dest, 'vmlinuz-kexec'))
     else:
-      shutil.copyfile(self.kexec_kernel, os.path.join(self.imgdir, 'scripts', 'vmlinuz-kexec'))
+      shutil.copyfile(self.kexec_kernel, os.path.join(dest, 'vmlinuz-kexec'))
 
     if urlRE.match(self.kexec_initramfs):
-      chunked_download(self.kexec_initramfs, os.path.join(self.imgdir, 'scripts', 'initramfs-kexec'))
+      chunked_download(self.kexec_initramfs, os.path.join(dest, 'initramfs-kexec'))
     else:
-      shutil.copyfile(self.kexec_initramfs, os.path.join(self.imgdir, 'scripts', 'initramfs-kexec'))
+      shutil.copyfile(self.kexec_initramfs, os.path.join(dest, 'initramfs-kexec'))
+
+  def getAmiCreator(self, dest):
+    chunked_download('https://raw.github.com/eucalyptus/ami-creator/master/ami_creator/ami_creator.py', 
+                     os.path.join(dest, 'ami_creator.py'))
 
   # Configure yum repositories
   def setupRepo(self, repoid, pkgname=None, ignoreHostCfg=False, mirrorlist=None, baseurl=None):
