@@ -1,0 +1,43 @@
+<comps>
+    <group>
+        <id>eucalyptus-cluster-controller</id>
+        <name>Eucalyptus Cluster Controller</name>
+        <default>false</default>
+        <uservisible>true</uservisible>
+        <description />
+        <packagelist>
+            <packagereq type="mandatory">eucalyptus-cc</packagereq>
+        </packagelist>
+    </group>
+    <group>
+        <id>eucalyptus-storage-controller</id>
+        <name>Eucalyptus Storage Controller</name>
+        <default>false</default>
+        <uservisible>true</uservisible>
+        <description />
+        <packagelist>
+            <packagereq type="mandatory">eucalyptus-sc</packagereq>
+        </packagelist>
+    </group>
+    <group>
+        <id>eucalyptus-node-controller</id>
+        <name>Eucalyptus Node Controller</name>
+        <default>false</default>
+        <uservisible>true</uservisible>
+        <description />
+        <packagelist>
+            <packagereq type="mandatory">eucalyptus-nc</packagereq>
+        </packagelist>
+    </group>
+    <group>
+        <id>eucalyptus-walrus</id>
+        <name>Eucalyptus Walrus</name>
+        <default>false</default>
+        <uservisible>true</uservisible>
+        <description />
+        <packagelist>
+            <packagereq type="mandatory">eucalyptus-walrus</packagereq>
+        </packagelist>
+    </group>
+</comps>
+

@@ -1,0 +1,18 @@
+#!/bin/sh
+
+#
+# One-time startup script to configure the CLC
+#
+# chkconfig: - 95 50
+# description: This script initializes and configures a CLC
+# processname: eucalyptus-frontend-config
+#
+
+case "$1" in
+  start)
+    /usr/local/sbin/eucalyptus-frontend-config
+    ;;
+  *)
+    exit 0
+    ;;
+esac
