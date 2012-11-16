@@ -195,10 +195,47 @@ chkconfig eucalyptus-cloud on
 
 euca_conf --register-nodes $CLOUD_PUBLIC_IP_ADDRESS
 
+# Fix user console CLC IP
+sed -i -e "s/^clchost:.*/clchost: $CLOUD_PUBLIC_IP_ADDRESS/" /etc/eucalyptus-console/console.ini
+service eucalyptus-console restart
+
 # Work around EUCA-4162
-cp -p /etc/eucalyptus/vtun.conf.template /usr/share/eucalyptus/
+cp -p /etc/eucalyptus/vtunall.conf.template /usr/share/eucalyptus/
 
 # authorize ssh for default security group
 euca-authorize -P tcp -p 22 default
+
+cp -r /root/credentials /etc/skel/
+mkdir /etc/skel/Desktop
+
+cat >/etc/skel/Desktop/Eucalyptus.desktop <<DESKTOPSHORTCUT
+[Desktop Entry]
+Encoding=UTF-8
+Name=Eucalyptus Web Admin
+Type=Link
+URL=https://${CLOUD_PUBLIC_IP_ADDRESS}:8443/
+Icon=gnome-fs-bookmark
+Name[en_US]=Eucalyptus Web Admin
+DESKTOPSHORTCUT
+
+cat >/etc/skel/Desktop/Eucalyptus_Docs.desktop <<DOCSSHORTCUT
+[Desktop Entry]
+Encoding=UTF-8
+Name=Eucalyptus Documentation
+Type=Link
+URL=http://www.eucalyptus.com/docs
+Icon=gnome-fs-bookmark
+Name[en_US]=Eucalyptus Documentation
+DOCSSHORTCUT
+
+cat >/etc/skel/Desktop/Eucalyptus_Console.desktop <<CONSOLESHORTCUT
+[Desktop Entry]
+Encoding=UTF-8
+Name=Eucalyptus User Console
+Type=Link
+URL=https://${CLOUD_PUBLIC_IP_ADDRESS}:8888/
+Icon=gnome-fs-bookmark
+Name[en_US]=Eucalyptus User Console
+CONSOLESHORTCUT
 
 
