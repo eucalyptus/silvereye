@@ -28,6 +28,7 @@ import _isys
 import re
 import network
 import os
+import urlgrabber.grabber
 
 import gettext
 _ = lambda x: gettext.ldgettext("anaconda", x)
@@ -83,9 +84,11 @@ class FrontendWindow (InstallWindow):
         self.privdns = self.xml.get_widget("privdns")
 
         self.validDevs = network.getActiveNetDevs()
-        if not self.validDevs:
-            # TODO: raise a warning box?
-            pass
+        while not self.validDevs:
+            self.intf.enableNetwork(just_setup=True)
+            if network.hasActiveNetDev():
+                urlgrabber.grabber.reset_curl_obj()
+            self.validDevs = network.getActiveNetDevs()
 
         privif = config.get('VNET_PRIVINTERFACE', '')
         if self.colocated_nc:
