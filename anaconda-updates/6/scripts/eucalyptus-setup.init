@@ -11,6 +11,7 @@
 case "$1" in
   start)
     /usr/local/sbin/eucalyptus-frontend-config
+    chkconfig eucalyptus-setup off
     ;;
   *)
     exit 0
