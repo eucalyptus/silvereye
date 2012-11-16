@@ -60,6 +60,7 @@ class InstallClass(silvereye.InstallClass):
                        'X Window System', 'Desktop', 'Fonts'])
         anaconda.backend.selectPackage("unzip")
         anaconda.backend.selectPackage("livecd-tools")
+        anaconda.backend.selectPackage("firefox")
 
         # For 3.2 and later
         anaconda.backend.selectPackage("eucalyptus-console")
