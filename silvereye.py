@@ -230,7 +230,10 @@ class SilvereyeBuilder(yum.YumBase):
 
   @property 
   def pkgdir(self):
-    return os.path.join(self.builddir, 'image', 'CentOS')
+    if self.distroversion == "5":
+      return os.path.join(self.builddir, 'image', 'CentOS')
+    else:
+      return os.path.join(self.builddir, 'image', 'Packages')
 
   @property
   def imgdir(self):
@@ -291,7 +294,7 @@ class SilvereyeBuilder(yum.YumBase):
     downloadUrl = repo.urls[0]
 
     # Create the build directory structure
-    for x in [ 'CentOS', 'images/pxeboot', 'isolinux', 'ks', 'scripts' ]:
+    for x in [ os.path.basename(self.pkgdir), 'images/pxeboot', 'isolinux', 'ks', 'scripts' ]:
       mkdir(os.path.join(self.imgdir, x))
 
     if self.distroversion == "5":
