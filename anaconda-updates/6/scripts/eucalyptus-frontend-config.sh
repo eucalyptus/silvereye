@@ -189,6 +189,16 @@ get_credentials
 
 euca-modify-property -p ${CLUSTER_NAME}.storage.blockstoragemanager=overlay
 
-install-unpacked-image.py -t /tmp/img -b centos6 -s "CentOS 6 demo" -a x86_64
+/usr/local/sbin/install-unpacked-image.py -t /tmp/img -b centos6 -s "CentOS 6 demo" -a x86_64 2>&1 | tee -a $LOGFILE
 
 chkconfig eucalyptus-cloud on
+
+euca_conf --register-nodes $CLOUD_PUBLIC_IP_ADDRESS
+
+# Work around EUCA-4162
+cp -p /etc/eucalyptus/vtun.conf.template /usr/share/eucalyptus/
+
+# authorize ssh for default security group
+euca-authorize -P tcp -p 22 default
+
+
