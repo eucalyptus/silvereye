@@ -199,9 +199,6 @@ euca_conf --register-nodes $CLOUD_PUBLIC_IP_ADDRESS
 sed -i -e "s/^clchost:.*/clchost: $CLOUD_PUBLIC_IP_ADDRESS/" /etc/eucalyptus-console/console.ini
 service eucalyptus-console restart
 
-# Work around EUCA-4162
-cp -p /etc/eucalyptus/vtunall.conf.template /usr/share/eucalyptus/
-
 # authorize ssh for default security group
 euca-authorize -P tcp -p 22 default
 
