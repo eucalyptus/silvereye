@@ -1,4 +1,6 @@
 #!/bin/sh
+# requires packages that may not be installed on a minimal system
+# run: yum install genisoimage dosfstools syslinux-extlinux
 
 ISO=$1
 DEVNAME=$2
