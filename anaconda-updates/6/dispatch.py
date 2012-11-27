@@ -40,7 +40,7 @@ from upgrade import upgradeSwapSuggestion, upgradeMigrateFind
 from upgrade import findRootParts, queryUpgradeContinue
 from installmethod import doMethodComplete
 from kickstart import runPostScripts
-from euca import memCheck, vtCheck
+from euca import memCheck, vtCheck, protectStorage
 
 from backend import doPostSelection, doBackendSetup, doBasePackageSelect
 from backend import doPreInstall, doPostInstall, doInstall
@@ -75,6 +75,7 @@ installSteps = [
     ("filtertype", ),
     ("filter", ),
     ("storageinit", storageInitialize, ),
+    ("protectstorage", protectStorage, ),
     ("findrootparts", findRootParts, ),
     ("findinstall", ),
     ("network", ),

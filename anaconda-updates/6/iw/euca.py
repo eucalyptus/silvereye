@@ -7,6 +7,7 @@ import string
 import language
 import shutil
 import traceback
+from storage import udev
 from flags import flags
 from constants import *
 
@@ -80,3 +81,9 @@ def vtCheck(anaconda):
             break
 
    
+def protectStorage(anaconda):
+    protparts = anaconda.id.storage.protectedDevices
+    for part in protparts:
+        protdisk = getattr(part, 'disk', '')
+        if protdisk:
+            anaconda.id.storage.ignoredDisks.append(protdisk.name)

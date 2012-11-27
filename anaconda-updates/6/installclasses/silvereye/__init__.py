@@ -20,10 +20,12 @@ from constants import *
 from pykickstart.constants import *
 from product import *
 from flags import flags
+import iutil
 import os
 import re
 import types
 from kickstart import AnacondaKSScript
+from storage.partspec import *
 
 import installmethod
 import yuminstall
@@ -64,18 +66,37 @@ class InstallClass(installclass.BaseInstallClass):
 
     def setInstallData(self, anaconda):
         installclass.BaseInstallClass.setInstallData(self, anaconda)
-        installclass.BaseInstallClass.setDefaultPartitioning(self,
-                                                anaconda.id.storage,
-                                                anaconda.platform)
+        anaconda.id.simpleFilter = True
+        self.setDefaultPartitioning(anaconda.id.storage,
+                                    anaconda.platform)
         anaconda.id.security.setSELinux(SELINUX_PERMISSIVE)
+
+    def setDefaultPartitioning(self, storage, platform):
+        autorequests = [PartSpec(mountpoint="/", fstype=storage.defaultFSType,
+                                 size=10240, grow=True, asVol=False, requiredSpace=20*1024)]
+
+        bootreq = platform.setDefaultPartitioning()
+        if bootreq:
+            autorequests.extend(bootreq)
+
+        (minswap, maxswap) = iutil.swapSuggestion()
+        autorequests.append(PartSpec(fstype="swap", size=minswap, maxSize=maxswap,
+                                     grow=True, asVol=False))
+
+        storage.autoPartitionRequests = autorequests
 
     def setSteps(self, anaconda):
         installclass.BaseInstallClass.setSteps(self, anaconda)
         # Unskip memcheck
         anaconda.dispatch.skipStep("memcheck", skip = 0)
+        anaconda.dispatch.skipStep("protectstorage", skip = 0)
         anaconda.dispatch.skipStep("tasksel",permanent=1)
         anaconda.dispatch.skipStep("firewall")
         anaconda.dispatch.skipStep("group-selection")
+        anaconda.dispatch.skipStep("filtertype")
+        anaconda.dispatch.skipStep("filter")
+        anaconda.dispatch.skipStep("partition")
+        # anaconda.dispatch.skipStep("parttype")
 
     def getBackend(self):
         if flags.livecdInstall:
