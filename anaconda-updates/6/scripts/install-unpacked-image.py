@@ -43,6 +43,9 @@ class InstallUnpackedImage(InstallImage):
         names = os.listdir(dir)
         kernel_dir=None
         kernel_found = False
+        kernel_id = ''
+        ramdisk_id = ''
+        id = ''
         for path in names:
             name = path
             if name.startswith('vmlin'):
@@ -51,12 +54,14 @@ class InstallUnpackedImage(InstallImage):
                     name = prefix+name
                 kernel_id = self.bundleFile(path, name, description, arch, 'true', None)
                 kernel_found = True
+                os.system('euca-modify-image-attribute -l -a all ' + kernel_id)
                 print kernel_id
             elif name.startswith('initr'):
                 print "Bundling/uploading ramdisk"
                 if prefix:
                     name = prefix+name
                 ramdisk_id = self.bundleFile(path, name, description, arch, None, 'true')
+                os.system('euca-modify-image-attribute -l -a all ' + ramdisk_id)
                 print ramdisk_id
 
         #now, install the image, referencing the kernel/ramdisk
@@ -69,6 +74,7 @@ class InstallUnpackedImage(InstallImage):
                 else:
                     name = name[:-len('.img')]
                 id = self.bundleFile(path, name, description, arch, kernel_id, ramdisk_id)
+                os.system('euca-modify-image-attribute -l -a all ' + id)
                 return id
 
 if __name__ == '__main__':
