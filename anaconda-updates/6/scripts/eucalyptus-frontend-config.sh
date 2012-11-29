@@ -228,6 +228,7 @@ unzip demo-admin.zip
 rm demo-admin.zip
 source eucarc
 euca-add-keypair demo > demo.private
+chmod 600 demo.private
 euca-authorize -P tcp -p 22 default
 popd
 
