@@ -119,6 +119,8 @@ if [ $fail ] ; then
   echo "$(date)- Cloud controller failed to start after 5 minutes. Check in /var/log/eucalyptus/startup.log" |tee -a $LOGFILE
 fi
 
+sleep 5
+
 eval export PUBLIC_INTERFACE=$( awk -F= '/^VNET_PUBINTERFACE/ { print $2 }' /etc/eucalyptus/eucalyptus.conf )
 PUB_BRIDGE=$( brctl show | awk "/$PUBLIC_INTERFACE/ { print \$1 }" )
 if [ -n "$PUB_BRIDGE" ]; then
@@ -139,7 +141,7 @@ echo "Using public IP $PUBLIC_IP_ADDRESS and private IP $PRIVATE_IP_ADDRESS to" 
 echo "register components" | tee -a $LOGFILE
 
 # Register Walrus
-if [ `/usr/sbin/euca_conf --list-walruses 2>/dev/null |wc -l` -eq 0 ]
+if [ `/usr/sbin/euca_conf --list-walruses 2>/dev/null | grep ^SERVICE |wc -l` -eq 0 ]
 then
   /usr/sbin/euca_conf --register-walrus --partition walrus --host $PUBLIC_IP_ADDRESS --component=walrus | tee -a $LOGFILE 
 else
@@ -175,9 +177,14 @@ function get_credentials {
   if [ ! -f /root/credentials/admin/eucarc ] ; then
     mkdir -p /root/credentials/admin | tee -a $LOGFILE
     cd /root/credentials/admin
-    euca_conf --get-credentials admin.zip | tee -a $LOGFILE
-    unzip admin.zip | tee -a $LOGFILE
-    source eucarc
+    while [ -z "$EUARE_URL" -o -z "$S3_URL" ]; do
+      rm admin.zip
+      euca_conf --get-credentials admin.zip | tee -a $LOGFILE
+      unzip -o admin.zip | tee -a $LOGFILE
+      source eucarc
+      sleep 5
+    done
+
     euca-add-keypair admin > admin.private
     cd /root
     ln -s /root/credentials/admin/eucarc .eucarc
