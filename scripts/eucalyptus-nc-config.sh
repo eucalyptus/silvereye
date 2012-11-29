@@ -372,6 +372,9 @@ case "$ELVERSION" in
 ;;
 esac
 
+sed -i -e '/^-A FORWARD -j REJECT/d' /etc/sysconfig/iptables
+iptables-restore < /etc/sysconfig/iptables
+
 # Start and configure eucalyptus-nc service
 /etc/init.d/eucalyptus-nc start >>$LOGFILE 2>&1
 error_check
