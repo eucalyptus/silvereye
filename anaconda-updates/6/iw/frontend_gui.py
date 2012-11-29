@@ -254,9 +254,10 @@ class FrontendWindow (InstallWindow):
                    "CREATE_SC_LOOP_DEVICES": "256",
                  }
 
-        privifcfg = anaconda.id.network.netdevices[privif]
-        privifcfg.set(("NM_CONTROLLED", "no"))
-        privifcfg.set(("NOZEROCONF", "true"))
+        if not self.colocated_nc:
+            privifcfg = anaconda.id.network.netdevices[privif]
+            privifcfg.set(("NM_CONTROLLED", "no"))
+            privifcfg.set(("NOZEROCONF", "true"))
 
         if self.colocated_nc or netmode == "MANAGED":
             config["VNET_PRIVINTERFACE"] = "br0"
@@ -284,7 +285,8 @@ class FrontendWindow (InstallWindow):
             anaconda.id.network.netdevices["br0"] = bridgeifcfg
             bridgeifcfg.write()
 
-        privifcfg.write()
+        if not self.colocated_nc:
+            privifcfg.write()
         
         eucaConf = open('/tmp/eucalyptus.conf', 'w')
         eucaConf.write("\n".join([ '%s="%s"' % (x, config[x]) for x in config.keys() ]))
