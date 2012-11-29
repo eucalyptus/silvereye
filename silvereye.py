@@ -427,6 +427,8 @@ class SilvereyeBuilder(yum.YumBase):
           os.mkdir(scriptsDir)
       self.getKexecFiles(scriptsDir)
       self.getAmiCreator(updatesdir)
+      shutil.copyfile(os.path.join(self.basedir, 'scripts', 'eucalyptus-nc-config.sh'),
+                      os.path.join(scriptsDir, 'eucalyptus-nc-config.sh'))
 
       # TODO: Remove this, I think, because we no longer rely on kickstart for EL6
       f = open('/usr/lib/anaconda/kickstart.py', 'r')
