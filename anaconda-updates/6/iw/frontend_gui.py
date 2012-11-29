@@ -19,6 +19,7 @@
 #
 
 import gtk
+import gobject
 import string
 import gui
 from iw_gui import *
@@ -82,28 +83,52 @@ class FrontendWindow (InstallWindow):
         self.addrspernet = self.xml.get_widget("addrspernet")
         self.privdnslabel = self.xml.get_widget("privdnslabel")
         self.privdns = self.xml.get_widget("privdns")
+        self.ncbridgelabel = self.xml.get_widget("ncbridgelabel")
+        self.ncbridge = self.xml.get_widget("ncbridge")
 
         self.validDevs = network.getActiveNetDevs()
-        while not self.validDevs:
-            self.intf.enableNetwork(just_setup=True)
-            if network.hasActiveNetDev():
-                urlgrabber.grabber.reset_curl_obj()
-            self.validDevs = network.getActiveNetDevs()
+        if not self.validDevs:
+            self.intf.messageWindow(_("No Network Device"),
+                                    _("Please go back and configure at least"
+                                      " one network device to continue"),
+                                    custom_icon="error",
+                                    custom_buttons=[_("_Back")])
+
+            self.anaconda.dispatch.gotoPrev()
+            self.icw.setScreen ()
 
         privif = config.get('VNET_PRIVINTERFACE', '')
+        '''
         if self.colocated_nc:
             self.privif.set_text("br0")
             self.privif.set_editable(False)
-        elif privif and privif in self.validDevs:
-            self.privif.set_text(privif)
         else:
-            self.privif.set_text(self.validDevs[0])
+            if privif and privif in self.validDevs:
+                self.privif.set_text(privif)
+            else:
+                 self.privif.set_text(self.validDevs[0])
+        '''
+        cell = gtk.CellRendererText()
+        self.privif.set_model(gtk.ListStore(gobject.TYPE_STRING))
+        self.privif.pack_start(cell)
+        self.privif.add_attribute(cell, 'text', 0)
+        if self.colocated_nc:
+            self.privif.append_text('br0')
+            self.ncbridge.set_text('172.31.252.1')
+        else:
+            # TODO: preserve privif selection if it existed
+            self.ncbridge.set_editable(False)
+            for interface in self.validDevs:
+                self.privif.append_text(interface)
+        self.privif.set_active(0)
 
-        pubif = config.get('VNET_PUBINTERFACE', '')
-        if pubif and pubif in self.validDevs:
-            self.pubif.set_text(pubif)
-        else:
-            self.pubif.set_text(self.validDevs[0])
+        cell = gtk.CellRendererText()
+        self.pubif.set_model(gtk.ListStore(gobject.TYPE_STRING))
+        self.pubif.pack_start(cell)
+        self.pubif.add_attribute(cell, 'text', 0)
+        for interface in self.validDevs:
+            self.pubif.append_text(interface)
+        self.pubif.set_active(0)
 
         ns = config.get('VNET_DNS', '')
         if ns:
@@ -114,7 +139,11 @@ class FrontendWindow (InstallWindow):
                             x.startswith('nameserver') ]
             self.privdns.set_text(' '.join(nameservers))
 
+        '''
         self.addrspernet.set_text(config.get('VNET_ADDRSPERNET', ''))
+        '''
+        self.addrspernet.set_active(1)
+
         # Set default values for private net
         self.privnet.set_text(config.get('VNET_SUBNET', '172.31.254.0'))
         self.privmask.set_text(config.get('VNET_NETMASK', '255.255.254.0'))
@@ -123,18 +152,10 @@ class FrontendWindow (InstallWindow):
         # load the icon
         gui.readImageFromFile("vendor-icon.png", image=self.icon)
 
-        # connect hotkeys
-        """
-        self.pw.set_text_with_mnemonic(_("Root _Password:"))
-        self.pwlabel.set_mnemonic_widget(self.pw)
-        self.confirmlabel.set_text_with_mnemonic(_("_Confirm:"))
-        self.confirmlabel.set_mnemonic_widget(self.confirm)
-        """
-
         # pressing Enter in Pub Net == clicking Next
-        vbox = self.xml.get_widget("frontend_box")
-        self.pubnet.connect("activate", lambda widget,
-                             vbox=vbox: self.ics.setGrabNext(1))
+        # vbox = self.xml.get_widget("frontend_box")
+        # self.pubnet.connect("activate", lambda widget,
+        #                      vbox=vbox: self.ics.setGrabNext(1))
 
         return self.align
 
@@ -148,13 +169,16 @@ class FrontendWindow (InstallWindow):
     def getNext (self):
         anaconda = self.ics.getICW().anaconda
 
-        privif = self.privif.get_text()
+        privif = self.privif.get_model()[self.privif.get_active()][0]
         privnet = self.privnet.get_text()
         privmask = self.privmask.get_text()
-        pubif = self.pubif.get_text()
+        pubif = self.pubif.get_model()[self.pubif.get_active()][0]
         pubnet = self.pubnet.get_text()
-        addrspernet = self.addrspernet.get_text()
+        addrspernet = self.addrspernet.get_model()[self.addrspernet.get_active()][0]
         privdns = self.privdns.get_text()
+        ncbridge = self.ncbridge.get_text()
+        # someday we may support Managed or System mode
+        netmode = "MANAGED-NOVLAN"
 
         errors = []
 
@@ -184,6 +208,14 @@ class FrontendWindow (InstallWindow):
         except network.IPMissing, e:
             errors.append(e.message)
 
+        if self.colocated_nc:
+            try:
+                network.sanityCheckIPString(ncbridge)
+            except network.IPError, e:
+                errors.append(e.message)
+            except network.IPMissing, e:
+                errors.append(e.message)
+
         if privnet and privmask:
             try:
                 checkSubnet(privnet, privmask)
@@ -210,48 +242,52 @@ class FrontendWindow (InstallWindow):
             self.validationError()
 
         # convert to long ugly names
-        # NOTE: We are hard-coding network mode
         config = {
-                   "VNET_PRIVINTERFACE": "br0",
+                   "VNET_PRIVINTERFACE": privif,
                    "VNET_SUBNET": privnet,
                    "VNET_NETMASK": privmask,
                    "VNET_DNS": privdns,
                    "VNET_PUBINTERFACE": pubif,
                    "VNET_PUBLICIPS": pubnet,
                    "VNET_ADDRSPERNET": addrspernet,
-                   "VNET_MODE": "MANAGED-NOVLAN",
+                   "VNET_MODE": netmode,
                    "CREATE_SC_LOOP_DEVICES": "256",
                  }
+
+        privifcfg = anaconda.id.network.netdevices[privif]
+        privifcfg.set(("NM_CONTROLLED", "no"))
+        privifcfg.set(("NOZEROCONF", "true"))
+
+        if self.colocated_nc or netmode == "MANAGED":
+            config["VNET_PRIVINTERFACE"] = "br0"
+            bridgeifcfg = network.NetworkDevice(network.netscriptsDir, "br0")
+            bridgeifcfg.set(("TYPE", "Bridge"))
+            bridgeifcfg.set(("DEVICE", "br0"))
+            bridgeifcfg.set(("NM_CONTROLLED", "no"))
+            bridgeifcfg.set(("DELAY", "0"))
+            bridgeifcfg.set(("ONBOOT", "yes"))
+
+            if self.colocated_nc:
+                bridgeifcfg.set(("BOOTPROTO", "static"))
+                bridgeifcfg.set(("IPADDR", ncbridge))
+                # I don't think there's any need for more than one IP here
+                bridgeifcfg.set(("NETMASK", "255.255.255.255"))
+            elif netmode == "MANAGED":
+                # connect the private interface to a bridge
+                privifcfg.set(("BRIDGE", "br0"))
+
+                for attr in [ "BOOTPROTO", "IPADDR", "NETMASK" ]:  
+                    value = privifcfg.get(attr)
+                    bridgeifcfg.set((attr, value))
+                    privifcfg.unset(attr)
+
+            anaconda.id.network.netdevices["br0"] = bridgeifcfg
+            bridgeifcfg.write()
+
+        privifcfg.write()
+        
         eucaConf = open('/tmp/eucalyptus.conf', 'w')
         eucaConf.write("\n".join([ '%s="%s"' % (x, config[x]) for x in config.keys() ]))
         eucaConf.close()
 
-        bridgeifcfg = network.NetworkDevice(network.netscriptsDir, "br0")
-        bridgeifcfg.set(("TYPE", "Bridge"))
-        bridgeifcfg.set(("DEVICE", "br0"))
-        bridgeifcfg.set(("NM_CONTROLLED", "no"))
-        bridgeifcfg.set(("DELAY", "0"))
-        bridgeifcfg.set(("ONBOOT", "yes"))
-
-        if self.colocated_nc:
-            bridgeifcfg.set(("BOOTPROTO", "static"))
-            privip = privnet[:-1] + str(int(privnet[-1]) + 1)
-            bridgeifcfg.set(("IPADDR", privip))
-            bridgeifcfg.set(("NETMASK", privmask))
-            bridgeifcfg.set(("NETWORK", privnet))
-        else:
-            # connect the private interface to a bridge
-            privifcfg = anaconda.id.network.netdevices[privif]
-            privifcfg.set(("NM_CONTROLLED", "no"))
-            privifcfg.set(("BRIDGE", "br0"))
-            privifcfg.set(("NOZEROCONF", "true"))
-
-            for attr in [ "BOOTPROTO", "IPADDR", "NETMASK" ]:  
-                value = privifcfg.get(attr)
-                bridgeifcfg.set((attr, value))
-                privifcfg.unset(attr)
-
-        anaconda.id.network.netdevices["br0"] = bridgeifcfg
-        bridgeifcfg.write()
-        
         return None
