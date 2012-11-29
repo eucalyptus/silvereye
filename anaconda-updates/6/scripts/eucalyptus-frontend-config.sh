@@ -49,8 +49,12 @@ function configure_frontend {
 # Modify /etc/hosts if hostname is not resolvable
 ping -c 1 `hostname` > /dev/null
 if [ $? -ne 0 ] ; then
-  EUCACONF_PUBINTERFACE=`grep '^VNET_PUBINTERFACE' /etc/eucalyptus/eucalyptus.conf | sed -e 's/VNET_PUBINTERFACE=\"\(.*\)\"/\1/'`
-  CLOUD_PUBLIC_IP_ADDRESS=`ip addr show $EUCACONF_PUBINTERFACE |grep inet |grep ${EUCACONF_PUBINTERFACE}\$|grep global|awk -F"[\t /]*" '{ print $3 }'`
+  EUCACONF_PUBINTERFACE=$( awk -F= '/^VNET_PUBINTERFACE/ { gsub("\"", "", $2); print $2 }' /etc/eucalyptus/eucalyptus.conf )
+  CLOUD_PUBLIC_IP_ADDRESS=$( ip addr show | awk -F"[\t /]*" "/inet.*global.*$EUCACONF_PUBINTERFACE/ { print \$3 }" )
+  # If VNET_PUBINTERFACE is a bridge
+  if [ -z $CLOUD_PUBLIC_IP_ADDRESS ] ; then
+    CLOUD_PUBLIC_IP_ADDRESS=$( ip addr show | awk -F"[\t /]*" "/inet.*global.*br0/ { print \$3 }" )
+  fi
   CLOUD_HOSTNAME=`hostname`
   CLOUD_SHORTHOSTNAME=`hostname | cut -d. -f1`
   if [ $CLOUD_HOSTNAME = $CLOUD_SHORTHOSTNAME ] ; then
