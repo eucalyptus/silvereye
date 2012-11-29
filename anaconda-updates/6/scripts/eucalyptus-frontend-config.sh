@@ -217,6 +217,20 @@ service eucalyptus-console restart
 # authorize ssh for default security group
 euca-authorize -P tcp -p 22 default
 
+# Create a non-admin user
+euare-accountcreate -a demo
+euare-useraddloginprofile --delegate demo -u admin -p demo
+euare-useraddkey --delegate demo -u admin
+mkdir /root/credentials/demo
+pushd /root/credentials/demo
+euca-get-credentials -a demo -u admin demo-admin.zip
+unzip demo-admin.zip
+rm demo-admin.zip
+source eucarc
+euca-add-keypair demo > demo.private
+euca-authorize -P tcp -p 22 default
+popd
+
 cp -r /root/credentials /etc/skel/
 mkdir /etc/skel/Desktop
 
