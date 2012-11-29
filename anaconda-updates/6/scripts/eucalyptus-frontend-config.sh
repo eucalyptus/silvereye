@@ -204,7 +204,11 @@ euca-modify-property -p ${CLUSTER_NAME}.storage.blockstoragemanager=overlay
 
 chkconfig eucalyptus-cloud on
 
-euca_conf --register-nodes $CLOUD_PUBLIC_IP_ADDRESS
+if rpm -q eucalyptus-nc ; then
+  NC_IP_ADDRESS=$( ip addr show | awk -F"[\t /]*" "/inet.*global.*br0/ { print \$3 }" )
+  echo "Registering local NC at $NC_IP_ADDRESS" | tee -a $LOGFILE
+  euca_conf --register-nodes $NC_IP_ADDRESS
+fi
 
 # Fix user console CLC IP
 sed -i -e "s/^clchost:.*/clchost: $CLOUD_PUBLIC_IP_ADDRESS/" /etc/eucalyptus-console/console.ini
