@@ -580,8 +580,8 @@ class SilvereyeBuilder(yum.YumBase):
     # Add desktop bits.  Do we want a build flag to ignore this?
     rpms.update(['firefox'])
 
-    # Useful debug tools
-    rpms.update(['tcpdump', 'strace'])
+    # Useful tools
+    rpms.update(['tcpdump', 'strace', 'man'])
 
     if self.eucaversion in [ 'nightly', '3.2' ]:
       rpms.update(['eucalyptus-console', 'eucadw'])

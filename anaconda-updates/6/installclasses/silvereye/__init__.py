@@ -61,7 +61,7 @@ class InstallClass(installclass.BaseInstallClass):
     def setGroupSelection(self, anaconda):
         for pkg in [ 'epel-release', 'elrepo-release',
                      'euca2ools-release', 'eucalyptus-release',
-                     'ntp', 'tcpdump', 'strace' ]:
+                     'ntp', 'tcpdump', 'strace', 'man' ]:
             anaconda.backend.selectPackage(pkg)
 
     def setInstallData(self, anaconda):
