@@ -147,16 +147,7 @@ class FrontendWindow (InstallWindow):
             self.icw.setScreen ()
 
         privif = config.get('VNET_PRIVINTERFACE', '')
-        '''
-        if self.colocated_nc:
-            self.privif.set_text("br0")
-            self.privif.set_editable(False)
-        else:
-            if privif and privif in self.validDevs:
-                self.privif.set_text(privif)
-            else:
-                 self.privif.set_text(self.validDevs[0])
-        '''
+
         cell = gtk.CellRendererText()
         self.privif.set_model(gtk.ListStore(gobject.TYPE_STRING))
         self.privif.pack_start(cell)
@@ -167,6 +158,8 @@ class FrontendWindow (InstallWindow):
         else:
             # TODO: preserve privif selection if it existed
             self.ncbridge.set_editable(False)
+            self.ncbridge.set_visible(False)
+            self.ncbridgelabel.set_visible(False)
             for interface in self.validDevs:
                 self.privif.append_text(interface)
         self.privif.set_active(0)
