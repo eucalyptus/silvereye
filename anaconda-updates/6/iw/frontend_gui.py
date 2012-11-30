@@ -25,11 +25,14 @@ import gui
 from iw_gui import *
 from flags import flags
 from constants import *
-import _isys
+import isys
 import re
 import network
 import os
 import urlgrabber.grabber
+import struct
+import socket
+import dbus
 
 import gettext
 _ = lambda x: gettext.ldgettext("anaconda", x)
@@ -49,6 +52,52 @@ def checkSubnet(net, mask):
         raise Exception("Invalid netmask for private network")
     else:
         return
+
+def getDeviceAddresses(dev):
+    if dev == '' or dev is None:
+       return None
+
+    bus = dbus.SystemBus()
+    DBUS_PROPS_IFACE = "org.freedesktop.DBus.Properties"
+    NM_DEVICE_IFACE = "org.freedesktop.NetworkManager.Device"
+    NM_SERVICE = "org.freedesktop.NetworkManager"
+    NM_MANAGER_PATH = "/org/freedesktop/NetworkManager"
+    NM_MANAGER_IFACE = "org.freedesktop.NetworkManager"
+    NM_IP4CONFIG_IFACE = "org.freedesktop.NetworkManager.IP4Config"
+    nm = bus.get_object(NM_SERVICE, NM_MANAGER_PATH)
+    devlist = nm.get_dbus_method("GetDevices")()
+    device_props_iface = None
+
+    for path in devlist:
+        device = bus.get_object(NM_SERVICE, path)
+        device_props_iface = dbus.Interface(device, DBUS_PROPS_IFACE)
+        device_interface = str(device_props_iface.Get(NM_DEVICE_IFACE, "Interface"))
+        if device_interface == dev:
+            break
+
+    if device_props_iface == None:
+        return None
+
+    ip4_config_path = device_props_iface.Get(NM_DEVICE_IFACE, 'Ip4Config')
+    ip4_config_obj = bus.get_object(NM_SERVICE, ip4_config_path)
+    ip4_config_props = dbus.Interface(ip4_config_obj, DBUS_PROPS_IFACE)
+
+    addresses = []
+
+    # Convert addr and netmask to proper long integers
+    # to allow for binary math
+    addrs = ip4_config_props.Get(NM_IP4CONFIG_IFACE, "Addresses")
+    for addr in addrs:
+        addrInt = socket.ntohl(addr[0])
+        nmInt = 0
+        for x in range((32-addr[1]),32):
+            nmInt |= 1 << x
+        addresses.append((addrInt, nmInt))
+    return addresses
+
+def isAddressInSubnet(ip, subnetinfo):
+    ipInt = struct.unpack('!L', socket.inet_pton(socket.AF_INET, ip))
+    return (ipInt[0] & subnetinfo[1]) == (subnetinfo[0] & subnetinfo[1])
 
 class FrontendWindow (InstallWindow):
     colocated_nc = 0
@@ -195,14 +244,24 @@ class FrontendWindow (InstallWindow):
             for n in nameservers:
                 network.sanityCheckIPString(n)
 
-            if pubnet.find('-') == -1:
-                pubips = pubnet.split()
-                for ip in pubips:
-                     network.sanityCheckIPString(ip)
+            pubaddresses = getDeviceAddresses(pubif)
+            if pubaddresses is None or not len(pubaddresses):
+                # This is a weird exception case.
+                errors.append("Public interface %s has no addresses!" % pubif)
             else:
-                start, end = pubnet.split('-')
-                network.sanityCheckIPString(start)
-                network.sanityCheckIPString(end)
+                if pubnet.find('-') == -1:
+                    pubips = pubnet.split()
+                    for ip in pubips:
+                         network.sanityCheckIPString(ip)
+                         if not isAddressInSubnet(ip, pubaddresses[0]):
+                             errors.append("IP %s is not in the public subnet" % ip)
+                else:
+                    start, end = pubnet.split('-')
+                    for ip in [ start, end ]:
+                        network.sanityCheckIPString(ip)
+                        if not isAddressInSubnet(ip, pubaddresses[0]):
+                            errors.append("IP %s is not in the public subnet" % ip)
+
         except network.IPError, e:
             errors.append(e.message)
         except network.IPMissing, e:
