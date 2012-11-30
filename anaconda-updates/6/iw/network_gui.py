@@ -86,6 +86,7 @@ class NetworkWindow(InstallWindow):
             editable = False
         for widget in [ self.ipaddr, self.netmask, self.defaultgw ]:
             widget.set_editable(editable)
+            widget.set_sensitive(editable)
 
     def _netifCombo_changed(self, *args):
         val = self.netifCombo.get_model()[self.netifCombo.get_active()][0]
@@ -100,6 +101,7 @@ class NetworkWindow(InstallWindow):
             self.ipaddr.set_text("")
             self.netmask.set_text("")
             self.defaultgw.set_text("")
+        self._dhcpCombo_changed()
 
     def _netconfButton_clicked(self, *args):
         setupNetwork(self.intf)
@@ -171,6 +173,18 @@ class NetworkWindow(InstallWindow):
                                     % "\n".join(errors),
                                     custom_icon="error")
             raise gui.StayOnScreen
+
+        if mode == "DHCP":
+            rc = self.intf.messageWindow(_("Dynamic IP Warning"),
+                                    _("You have selected DHCP mode for "
+                                      "your primary interface.  Note that "
+                                      "you *must* have a static DHCP "
+                                      "reservation for this to work.\n"),
+                                      type="custom",
+                                      custom_icon="warning",
+                                      custom_buttons=[_("_Back"), _("_Continue")])
+            if not rc:
+                raise gui.StayOnScreen
             
         self.anaconda.id.network.setHostname(hostname)
         dev = self.anaconda.id.network.netdevices[netif]
