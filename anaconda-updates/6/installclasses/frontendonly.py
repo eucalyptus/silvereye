@@ -21,6 +21,7 @@ from product import *
 from flags import flags
 import os
 import re
+import shutil
 import types
 
 class InstallClass(frontend.InstallClass):
@@ -47,3 +48,8 @@ class InstallClass(frontend.InstallClass):
                "eucalyptus-cluster-controller"]),
               ]
  
+    def postAction(self, anaconda):
+        frontend.InstallClass.postAction(self, anaconda):
+        shutil.copyfile('/tmp/updates/scripts/eucalyptus-firstboot-nodereg.py',
+                        '/mnt/sysimage/usr/share/firstboot/modules/eucalyptus-firstboot-nodereg.py')
+
