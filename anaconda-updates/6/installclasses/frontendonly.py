@@ -49,7 +49,7 @@ class InstallClass(frontend.InstallClass):
               ]
  
     def postAction(self, anaconda):
-        frontend.InstallClass.postAction(self, anaconda):
+        frontend.InstallClass.postAction(self, anaconda)
         shutil.copyfile('/tmp/updates/scripts/eucalyptus-firstboot-nodereg.py',
                         '/mnt/sysimage/usr/share/firstboot/modules/eucalyptus-firstboot-nodereg.py')
 

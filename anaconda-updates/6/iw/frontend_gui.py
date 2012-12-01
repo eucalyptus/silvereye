@@ -158,8 +158,11 @@ class FrontendWindow (InstallWindow):
         else:
             # TODO: preserve privif selection if it existed
             self.ncbridge.set_editable(False)
-            self.ncbridge.set_visible(False)
-            self.ncbridgelabel.set_visible(False)
+            # The hide functions don't seem to work, so at least make the
+            # entry insensitive.
+            self.ncbridge.set_sensitive()
+            self.ncbridge.hide()
+            self.ncbridgelabel.hide()
             for interface in self.validDevs:
                 self.privif.append_text(interface)
         self.privif.set_active(0)
