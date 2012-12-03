@@ -20,6 +20,7 @@ from constants import *
 from product import *
 from flags import flags
 import isys
+import iutil
 import os
 import re
 import shutil
@@ -29,6 +30,31 @@ from kickstart import AnacondaKSScript
 
 import gettext
 _ = lambda x: gettext.ldgettext("anaconda", x)
+
+class ImageProgress(object):
+    def __init__(self, progressWindow, status):
+        self.progressWindow = progressWindow
+        self.status = status
+        self.data = ['']
+
+def imageProgress(data, callback_data=None):
+    if not callback_data:
+        return
+
+    if not data.endswith('\n'):
+        callback_data.data[-1] += data
+        return
+
+    line = callback_data.data[-1]
+    callback_data.data.append('')
+
+    m = re.match('.*Installing:\s+(\S+)\s+.*\[\s*(\d+)/(\d+)\].*', line)
+    if not m:
+        return
+
+    (pkg, cur, tot) = m.groups()[0:3]
+    callback_data.progressWindow.set(100 * int(cur) / int(tot))
+    callback_data.status.set_text('Installing %s (%s of %s)' % (pkg, cur, tot))
 
 class InstallClass(silvereye.InstallClass):
     # name has underscore used for mnemonics, strip if you dont need it
@@ -151,13 +177,12 @@ class InstallClass(silvereye.InstallClass):
             bindmount = True
 
         # eucalyptus.conf fragment from config screen
-        w = anaconda.intf.waitWindow(_("Creating EMI"), _("Creating an initial CentOS 6 EMI."))
+        w = anaconda.intf.progressWindow(_("Creating EMI"), 
+                                     _("Creating an initial CentOS 6 EMI."), 100)
         shutil.copyfile('/tmp/eucalyptus.conf',
                         '/mnt/sysimage/etc/eucalyptus/eucalyptus.conf.anaconda')
         postscriptlines ="""
 /usr/sbin/euca_conf --upgrade-conf /etc/eucalyptus/eucalyptus.conf.anaconda
-cd /tmp/img
-/tmp/ami_creator.py -m -c /tmp/ks-centos6.cfg 
 chkconfig dnsmasq off
 chkconfig eucalyptus-cloud off
 chkconfig eucalyptus-setup on
@@ -167,6 +192,18 @@ chkconfig eucalyptus-setup on
                                       logfile='/root/frontend-ks-post.log',
                                       type=KS_SCRIPT_POST)
         postscript.run(anaconda.rootPath, flags.serial, anaconda.intf)
+
+        # XXX: Refactor this so that we can do text installs
+        import gtk
+        pkgstatus = gtk.Label("Preparing to install...")
+        w.window.child.add(pkgstatus)
+        pkgstatus.show()
+
+        messages = '/root/ami-creation.log'
+        rc = iutil.execWithCallback('/bin/sh' , ['-c', 'cd /tmp/img; /tmp/ami_creator.py -m -c /tmp/ks-centos6.cfg'],
+                                    stdin = messages, stdout = messages, stderr = messages,
+                                    root = '/mnt/sysimage', callback=imageProgress, 
+                                    callback_data=ImageProgress(w, pkgstatus))
 
         if bindmount:
             isys.umount('/mnt/sysimage/mnt/source')
