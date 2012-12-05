@@ -10,7 +10,9 @@
 
 case "$1" in
   start)
+    plymouth --hide-splash
     /usr/local/sbin/eucalyptus-frontend-config
+    plymouth --show-splash
     chkconfig eucalyptus-setup off
     ;;
   *)
