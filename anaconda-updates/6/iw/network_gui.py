@@ -92,12 +92,12 @@ class NetworkWindow(InstallWindow):
         val = self.netifCombo.get_model()[self.netifCombo.get_active()][0]
         dev = self.anaconda.id.network.netdevices[val]
         if dev.get('BOOTPROTO') == "static":
-            self.dhcpCombo.set_active(1)
+            self.dhcpCombo.set_active(0)
             self.ipaddr.set_text(dev.get("IPADDR"))
             self.netmask.set_text(dev.get("NETMASK"))
             self.defaultgw.set_text(dev.get("GATEWAY"))
         else:
-            self.dhcpCombo.set_active(0)
+            self.dhcpCombo.set_active(1)
             self.ipaddr.set_text("")
             self.netmask.set_text("")
             self.defaultgw.set_text("")
@@ -179,7 +179,9 @@ class NetworkWindow(InstallWindow):
                                     _("You have selected DHCP mode for "
                                       "your primary interface.  Note that "
                                       "you *must* have a static DHCP "
-                                      "reservation for this to work.\n"),
+                                      "reservation for this to work.  IP "
+                                      "address changes after installation "
+                                      "are completely unsupported\n"),
                                       type="custom",
                                       custom_icon="warning",
                                       custom_buttons=[_("_Back"), _("_Continue")])
