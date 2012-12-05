@@ -112,6 +112,8 @@ class InstallClass(installclass.BaseInstallClass):
 if [ -e /etc/libvirt/qemu/networks/autostart/default.xml ]; then
   rm -f /etc/libvirt/qemu/networks/autostart/default.xml
 fi
+/sbin/chkconfig ntpdate on
+/sbin/chkconfig ntpd on
 """
         postscript = AnacondaKSScript(postscriptlines,
                                       inChroot=True,
