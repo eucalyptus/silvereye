@@ -225,15 +225,17 @@ class FrontendWindow (InstallWindow):
         errors = []
 
         if not self.colocated_nc and not privif in self.validDevs:
-            errors.append("Private interface %s is not a valid device" % privif)
+            errors.append("Private interface %s is not a valid device." % privif)
         if not pubif in self.validDevs:
-            errors.append("Public interface %s is not a valid device" % pubif)
+            errors.append("Public interface %s is not a valid device." % pubif)
 
         try:
             network.sanityCheckIPString(privnet) 
             network.sanityCheckIPString(privmask)
 
             nameservers = privdns.split()
+            if not len(nameservers):
+                errors.append("At least one DNS server IP must be specified.")
             for n in nameservers:
                 network.sanityCheckIPString(n)
 
@@ -244,16 +246,18 @@ class FrontendWindow (InstallWindow):
             else:
                 if pubnet.find('-') == -1:
                     pubips = pubnet.split()
+                    if not len(pubips):
+                        errors.append("The public IP field cannot be empty.")
                     for ip in pubips:
                          network.sanityCheckIPString(ip)
                          if not isAddressInSubnet(ip, pubaddresses[0]):
-                             errors.append("IP %s is not in the public subnet" % ip)
+                             errors.append("IP %s is not in the public subnet." % ip)
                 else:
                     start, end = pubnet.split('-')
                     for ip in [ start, end ]:
                         network.sanityCheckIPString(ip)
                         if not isAddressInSubnet(ip, pubaddresses[0]):
-                            errors.append("IP %s is not in the public subnet" % ip)
+                            errors.append("IP %s is not in the public subnet." % ip)
 
         except network.IPError, e:
             errors.append(e.message)
@@ -285,11 +289,11 @@ class FrontendWindow (InstallWindow):
             if addrspernet and not re.match(r'^0b10*$', bin(int(addrspernet))):
                 errors.append("Addrs per net must be an integer power of two.")
         except ValueError:
-            errors.append('Addrs per net must be an integer')
+            errors.append('Addrs per net must be an integer. ')
 
         if len(errors):
             self.intf.messageWindow(_("Error with Configuration"),
-                                    _(" ".join(errors)),
+                                    _("\n".join(errors)),
                                     custom_icon="error")
             self.validationError()
 
