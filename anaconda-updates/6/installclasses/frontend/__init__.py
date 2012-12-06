@@ -182,6 +182,9 @@ class InstallClass(silvereye.InstallClass):
                                      _("Creating an initial CentOS 6 EMI."), 100)
         shutil.copyfile('/tmp/eucalyptus.conf',
                         '/mnt/sysimage/etc/eucalyptus/eucalyptus.conf.anaconda')
+        shutil.copyfile('/tmp/updates/scripts/eucalyptus-firstboot-final.py',
+                        '/mnt/sysimage/usr/share/firstboot/modules/eucalyptus-firstboot-final.py')
+
         postscriptlines ="""
 /usr/sbin/euca_conf --upgrade-conf /etc/eucalyptus/eucalyptus.conf.anaconda
 chkconfig dnsmasq off
