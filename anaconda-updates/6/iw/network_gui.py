@@ -31,10 +31,21 @@ import subprocess
 import gtk
 import isys
 import urlgrabber.grabber
+import socket, struct
 
 from constants import *
 import gettext
 _ = lambda x: gettext.ldgettext("anaconda", x)
+
+def netmask2prefix(netmask):
+    nmInt = struct.unpack("!L", socket.inet_aton(netmask))[0]
+    prefix = 32
+    while prefix > 0:
+        if nmInt & 1:
+            break
+        nmInt >>= 1
+        prefix -= 1
+    return prefix
 
 class NetworkWindow(InstallWindow):
     def getScreen(self, anaconda):
@@ -72,8 +83,18 @@ class NetworkWindow(InstallWindow):
         self.netifCombo.connect("changed", self._netifCombo_changed)
         self.dhcpCombo = self.xml.get_widget("dhcpcombo")
         self.dhcpCombo.connect("changed", self._dhcpCombo_changed)
-        self.dhcpCombo.set_active(0)
 
+        self.dnsserver = self.xml.get_widget("dnsserver")
+
+        # load current network settings
+        self._netifCombo_changed()
+
+        # Only reset to Static mode when we are going forward.
+        # A little hacky, but good enough for now.
+        if anaconda.dir == DISPATCH_FORWARD:
+            self.dhcpCombo.set_active(0)
+            self._dhcpCombo_changed()
+ 
         # load the icon
         gui.readImageFromFile("network.png", image=self.icon)
 
@@ -91,21 +112,38 @@ class NetworkWindow(InstallWindow):
     def _netifCombo_changed(self, *args):
         val = self.netifCombo.get_model()[self.netifCombo.get_active()][0]
         dev = self.anaconda.id.network.netdevices[val]
-        if dev.get('BOOTPROTO') == "static":
+        if dev.get('BOOTPROTO') in ["static", "none"]:
             self.dhcpCombo.set_active(0)
             self.ipaddr.set_text(dev.get("IPADDR"))
-            self.netmask.set_text(dev.get("NETMASK"))
+            netmask = dev.get("NETMASK")
+            if not netmask:
+                prefix = dev.get("PREFIX")
+                if prefix:
+                    netmask = socket.inet_ntoa(struct.pack("<L", ((1L<<int(prefix))-1)))
+
+            self.netmask.set_text(netmask)
             self.defaultgw.set_text(dev.get("GATEWAY"))
+            dnsservers = []
+            i = 1
+            while True:
+                server = dev.get("DNS%d" % i)
+                if server:
+                    dnsservers.append(server)
+                else:
+                    break
+                i += 1
+            self.dnsserver.set_text(",".join(dnsservers))
         else:
             self.dhcpCombo.set_active(1)
             self.ipaddr.set_text("")
             self.netmask.set_text("")
             self.defaultgw.set_text("")
+            self.dnsserver.set_text("")
         self._dhcpCombo_changed()
 
     def _netconfButton_clicked(self, *args):
         setupNetwork(self.intf)
-        self._netifCombo_changed()
+        self._netifCombo_changed(self, *args)
 
     def focus(self):
         self.hostnameEntry.grab_focus()
@@ -169,7 +207,7 @@ class NetworkWindow(InstallWindow):
             self.intf.messageWindow(_("Error with Network Configuration"),
                                     _("The network configuration is not "
                                       "valid for the following reason(s):\n\n"
-                                      "%(herrors)s")
+                                      "%s")
                                     % "\n".join(errors),
                                     custom_icon="error")
             raise gui.StayOnScreen
@@ -187,6 +225,15 @@ class NetworkWindow(InstallWindow):
                                       custom_buttons=[_("_Back"), _("_Continue")])
             if not rc:
                 raise gui.StayOnScreen
+
+        dnsservers = self.dnsserver.get_text().split(',')
+        for server in dnsservers:
+            try:
+                network.sanityCheckIPString(server)
+            except network.IPError, e:
+                errors.append(e.message)
+            except network.IPMissing, e:
+                errors.append(e.message)
             
         self.anaconda.id.network.setHostname(hostname)
         dev = self.anaconda.id.network.netdevices[netif]
@@ -195,11 +242,15 @@ class NetworkWindow(InstallWindow):
             dev.set(("IPADDR", ipaddr))
             dev.set(("NETMASK", netmask))
             dev.set(("GATEWAY", defaultgw))
+            dev.set(("PREFIX", str(netmask2prefix(netmask))))
         else:
             dev.unset("IPADDR")
             dev.unset("NETMASK")
             dev.unset("GATEWAY")
+            dev.unset("PREFIX")
         dev.set(('ONBOOT', 'yes'))
+
+        self.anaconda.id.network.setDNS(self.dnsserver.get_text(), netif)
 
         w = self.anaconda.intf.waitWindow(_("Configuring Network Interfaces"), _("Waiting for NetworkManager"))
         result = self.anaconda.id.network.bringUp()
