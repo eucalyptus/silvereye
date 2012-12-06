@@ -35,22 +35,23 @@ class ImageProgress(object):
     def __init__(self, progressWindow, status):
         self.progressWindow = progressWindow
         self.status = status
-        self.data = ['']
+        self.data = ''
 
 def imageProgress(data, callback_data=None):
     if not callback_data:
         return
 
-    if not data.endswith('\n'):
-        callback_data.data[-1] += data
-        return
+    callback_data.data += data
+    lines = callback_data.data.split('\n')
 
-    line = callback_data.data[-1]
-    callback_data.data.append('')
-
-    m = re.match('.*Installing:\s+(\S+)\s+.*\[\s*(\d+)/(\d+)\].*', line)
+    m = re.match('.*Installing:\s+(\S+)\s+.*\[\s*(\d+)/(\d+)\].*', lines[-1])
     if not m:
-        return
+        if len(lines) == 1:
+            return
+        m = re.match('.*Installing:\s+(\S+)\s+.*\[\s*(\d+)/(\d+)\].*', lines[-2])
+        if not m:
+            # TODO: Report other progress than just package installs
+            return
 
     (pkg, cur, tot) = m.groups()[0:3]
     callback_data.progressWindow.set(100 * int(cur) / int(tot))
