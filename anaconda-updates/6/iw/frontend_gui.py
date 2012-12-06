@@ -56,8 +56,8 @@ def checkSubnet(net, mask):
 def compareIPs(addr1, addr2):
     # Determine whether addr1 is less than, equal to, or greater
     # than addr2, using the same convention that cmp does
-    oct1 = addr1.split(".")
-    oct2 = addr2.split(".")
+    oct1 = [int(x) for x in addr1.split(".")]
+    oct2 = [int(x) for x in addr2.split(".")]
     return cmp(oct1[0], oct2[0]) or cmp(oct1[1], oct2[1]) or \
            cmp(oct1[2], oct2[2]) or cmp(oct1[3], oct2[3])
 
@@ -210,10 +210,10 @@ class FrontendWindow (InstallWindow):
         return self.align
 
     def focus(self):
-        self.privnet.grab_focus()
+        self.pubnet.grab_focus()
 
     def validationError(self):
-        self.privnet.grab_focus()
+        self.pubnet.grab_focus()
         raise gui.StayOnScreen
 
     def getNext (self):
@@ -266,8 +266,8 @@ class FrontendWindow (InstallWindow):
                         network.sanityCheckIPString(ip)
                         if not isAddressInSubnet(ip, pubaddresses[0]):
                             errors.append("IP %s is not in the public subnet." % ip)
-                        if compareIPs(start, end) > 0:
-                            errors.append("The public IP range order is incorrect: %s > %s" % (start, end))
+                    if compareIPs(start, end) > 0:
+                        errors.append("The public IP range order is incorrect: %s > %s" % (start, end))
 
         except network.IPError, e:
             errors.append(e.message)
