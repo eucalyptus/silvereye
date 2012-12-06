@@ -53,6 +53,14 @@ def checkSubnet(net, mask):
     else:
         return
 
+def compareIPs(addr1, addr2):
+    # Determine whether addr1 is less than, equal to, or greater
+    # than addr2, using the same convention that cmp does
+    oct1 = addr1.split(".")
+    oct2 = addr2.split(".")
+    return cmp(oct1[0], oct2[0]) or cmp(oct1[1], oct2[1]) or \
+           cmp(oct1[2], oct2[2]) or cmp(oct1[3], oct2[3])
+
 def getDeviceAddresses(dev):
     if dev == '' or dev is None:
        return None
@@ -258,6 +266,8 @@ class FrontendWindow (InstallWindow):
                         network.sanityCheckIPString(ip)
                         if not isAddressInSubnet(ip, pubaddresses[0]):
                             errors.append("IP %s is not in the public subnet." % ip)
+                        if compareIPs(start, end) > 0:
+                            errors.append("The public IP range order is incorrect: %s > %s" % (start, end))
 
         except network.IPError, e:
             errors.append(e.message)
