@@ -226,7 +226,8 @@ class NetworkWindow(InstallWindow):
             if not rc:
                 raise gui.StayOnScreen
 
-        dnsservers = self.dnsserver.get_text().split(',')
+        dnsservers = []
+        [ dnsservers.extend(x.split()) for x in self.dnsserver.get_text().split(",") ]
         for server in dnsservers:
             try:
                 network.sanityCheckIPString(server)
@@ -250,7 +251,7 @@ class NetworkWindow(InstallWindow):
             dev.unset("PREFIX")
         dev.set(('ONBOOT', 'yes'))
 
-        self.anaconda.id.network.setDNS(self.dnsserver.get_text(), netif)
+        self.anaconda.id.network.setDNS(','.join(dnsservers), netif)
 
         w = self.anaconda.intf.waitWindow(_("Configuring Network Interfaces"), _("Waiting for NetworkManager"))
         result = self.anaconda.id.network.bringUp()

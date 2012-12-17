@@ -241,7 +241,8 @@ class FrontendWindow (InstallWindow):
             network.sanityCheckIPString(privnet) 
             network.sanityCheckIPString(privmask)
 
-            nameservers = privdns.split()
+            nameservers = []
+            [ nameservers.extend(x.split()) for x in privdns.split(",") ]
             if not len(nameservers):
                 errors.append("At least one DNS server IP must be specified.")
             for n in nameservers:
@@ -312,7 +313,7 @@ class FrontendWindow (InstallWindow):
                    "VNET_PRIVINTERFACE": privif,
                    "VNET_SUBNET": privnet,
                    "VNET_NETMASK": privmask,
-                   "VNET_DNS": privdns,
+                   "VNET_DNS": privdns.replace(',', ' '),
                    "VNET_PUBINTERFACE": pubif,
                    "VNET_PUBLICIPS": pubnet,
                    "VNET_ADDRSPERNET": addrspernet,
