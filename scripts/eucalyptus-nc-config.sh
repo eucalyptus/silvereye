@@ -123,8 +123,15 @@ sed --in-place 's/^VNET_MODE="SYSTEM"/#VNET_MODE="MANAGED-NOVLAN"/' /etc/eucalyp
 echo "We need some network information"
 echo ""
 EUCACONFIG=/etc/eucalyptus/eucalyptus.conf
-edit_prop VNET_PUBINTERFACE "The NC public ethernet interface (connected to Frontend private network)" $EUCACONFIG
-NC_PUBINTERFACE=`grep '^VNET_PUBINTERFACE=' /etc/eucalyptus/eucalyptus.conf | sed -e 's/.*VNET_PUBINTERFACE=\"\(.*\)\"/\1/'`
+while true; do
+  edit_prop VNET_PUBINTERFACE "The NC public ethernet interface (connected to Frontend private network)" $EUCACONFIG
+  NC_PUBINTERFACE=`grep '^VNET_PUBINTERFACE=' /etc/eucalyptus/eucalyptus.conf | sed -e 's/.*VNET_PUBINTERFACE=\"\(.*\)\"/\1/'`
+  if [ ! -f /etc/sysconfig/network-scripts/ifcfg-${NC_PUBINTERFACE} ]; then
+    echo "Ethernet interface $NC_PUBINTERFACE either does not exist or is not configured."
+  else
+    break
+  fi
+done
 
 # Make some configuration changes based on user input
   NC_BRIDGE="br0"
