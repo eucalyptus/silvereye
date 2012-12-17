@@ -226,13 +226,12 @@ done
 echo ""
 
 # Edit the default eucalyptus.conf
-sed --in-place 's/^VNET_MODE="SYSTEM"/#VNET_MODE="SYSTEM"/' /etc/eucalyptus/eucalyptus.conf >>$LOGFILE 2>&1
+sed --in-place 's/^VNET_MODE="SYSTEM"/#VNET_MODE="MANAGED-NOVLAN"/' /etc/eucalyptus/eucalyptus.conf >>$LOGFILE 2>&1
 
 # Gather information from the user, and perform eucalyptus.conf property edits
 echo "We need some network information"
 echo ""
 EUCACONFIG=/etc/eucalyptus/eucalyptus.conf
-edit_prop VNET_MODE "Which Eucalyptus networking mode would you like to use? " $EUCACONFIG
 edit_prop VNET_PUBINTERFACE "The NC public ethernet interface (connected to Frontend private network)" $EUCACONFIG
 NC_PUBINTERFACE=`grep '^VNET_PUBINTERFACE=' /etc/eucalyptus/eucalyptus.conf | sed -e 's/.*VNET_PUBINTERFACE=\"\(.*\)\"/\1/'`
 
