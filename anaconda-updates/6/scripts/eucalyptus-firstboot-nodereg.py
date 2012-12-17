@@ -30,6 +30,7 @@ from eucadmin.synckeys import SyncKeys
 from eucadmin.configfile import ConfigFile
 import subprocess
 import os
+import socket
 
 import gettext
 _ = lambda x: gettext.ldgettext("firstboot", x)
@@ -55,6 +56,20 @@ class moduleClass(Module):
         file_paths = [os.path.join(key_dir, key) for key in keys]
 
         for node in nodes_to_add:
+            try:
+                socket.inet_pton(socket.AF_INET, node)
+            except socket.error:
+                self._showErrorMessage("IPv4 addresses must contain four numbers between 0 and 255, separated by periods.")
+                self.nodeIP.grab_focus()
+                return RESULT_FAILURE
+
+        display = os.environ.get('DISPLAY', '')
+        if not display:
+            x = getattr(config.frontend, 'x', '')
+            if x:
+                display = open('/proc/%s/cmdline' % x.pid, 'r').read().split('\0')[1]
+
+        for node in nodes_to_add:
             if node not in current_nodes:
                 current_nodes.append(node)
 
@@ -63,12 +78,13 @@ class moduleClass(Module):
             p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE,
                                       env={ 'PATH': os.environ['PATH'],
-                                            'DISPLAY': open('/proc/%s/cmdline' % config.frontend.x.pid, 'r').read().split('\0')[1],
+                                            'DISPLAY': display,
                                             'SSH_ASKPASS': '/usr/libexec/openssh/gnome-ssh-askpass' } )
             out, err = p.communicate()
             if p.returncode:
                 # TODO: display errors in a message window
                 self._showErrorMessage(err)
+                self.nodeIP.grab_focus()
                 return RESULT_FAILURE
 
         eucaconfig['NODES'] = ' '.join(current_nodes)
@@ -91,6 +107,15 @@ Please enter the IP address of one or more nodes to register.  You will be promp
 
         self.vbox.pack_start(label, False, True)
         self.vbox.pack_start(self.nodeIP, False)
+
+    def focus(self):
+        self.nodeIP.grab_focus()
+
+    def renderModule(self, interface):
+        # We are not supposed to override this, but it's the only way to
+        # connect this event.
+        Module.renderModule(self, interface)
+        self.nodeIP.connect("activate", interface._nextClicked)
 
     def initializeUI(self):
         pass
