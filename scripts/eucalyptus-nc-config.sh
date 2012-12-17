@@ -23,9 +23,6 @@
 # Set log file destination
 export LOGFILE=/var/log/eucalyptus-nc-config.log
 
-# Set ELVERSION
-export ELVERSION=`cat /etc/redhat-release | sed -e 's/.* \([56]\).*/\1/'`
-
 # Adding a spinner function, thanks to Louis Marascio for the snippet:
 # http://fitnr.com/showing-a-bash-spinner.html
 
@@ -156,17 +153,10 @@ if [ $? -ne 0 ] ; then
       echo "   b) /etc/sysconfig/network"
       echo "   c) /etc/sysconfig/resolv.conf"
       echo ""
-      case "$ELVERSION" in
-      "5")
-        echo "3) Re-install your system, and make sure you enter the correct networking"
-        echo "   information on the appropriate screen."
-      ;;
-      "6")
         echo "3) Re-install your system, and make sure you click the 'Configure Network'"
         echo "   button when prompted to enter your hostname.  Also make sure to check the"
         echo "   'Connect Automatically' box for each network interface that you want enabled"
         echo "   when the system boots."
-      ;;
       esac
       echo ""
       echo "If you choose (1) or (2) to fix your existing installation, use"
@@ -235,18 +225,7 @@ while ! echo "$ENABLENTPSYNC" | grep -iE '(^y$|^yes$|^n$|^no$)' > /dev/null ; do
 done
 echo ""
 
-# Set NC_HYPERVISOR
-case "$ELVERSION" in
-"5")
-  NC_HYPERVISOR="xen"
-;;
-"6")
-  NC_HYPERVISOR="kvm"
-;;
-esac
-
 # Edit the default eucalyptus.conf
-sed -i -e "s/.*HYPERVISOR=\".*\"/HYPERVISOR=\"$NC_HYPERVISOR\"/" /etc/eucalyptus/eucalyptus.conf
 sed --in-place 's/^VNET_MODE="SYSTEM"/#VNET_MODE="SYSTEM"/' /etc/eucalyptus/eucalyptus.conf >>$LOGFILE 2>&1
 
 # Gather information from the user, and perform eucalyptus.conf property edits
@@ -257,54 +236,7 @@ edit_prop VNET_MODE "Which Eucalyptus networking mode would you like to use? " $
 edit_prop VNET_PUBINTERFACE "The NC public ethernet interface (connected to Frontend private network)" $EUCACONFIG
 NC_PUBINTERFACE=`grep '^VNET_PUBINTERFACE=' /etc/eucalyptus/eucalyptus.conf | sed -e 's/.*VNET_PUBINTERFACE=\"\(.*\)\"/\1/'`
 
-# Make some configuration changes based on user input and OS version
-case "$ELVERSION" in
-"5")
-  NC_BRIDGE="xenbr0"
-  sed -i -e "s/.*VNET_BRIDGE=\".*\"/VNET_BRIDGE=\"$NC_BRIDGE\"/" /etc/eucalyptus/eucalyptus.conf
-  # Edit the xen configuration files
-  echo "$(date) - Configuring xen" | tee -a $LOGFILE
-  sed -i -e "s/.*(xend-http-server .*/(xend-http-server yes)/" /etc/xen/xend-config.sxp >>$LOGFILE 2>&1
-  sed -i -e "s/.*(xend-address localhost)/(xend-address localhost)/" /etc/xen/xend-config.sxp >>$LOGFILE 2>&1
-  sed -i -e "s/^(network-script network-bridge)/(network-script 'network-bridge netdev=$NC_PUBINTERFACE')/" /etc/xen/xend-config.sxp >>$LOGFILE 2>&1
-  sed -i -e "s/^(xend-relocation-hosts-allow/#(xend-relocation-hosts-allow/" /etc/xen/xend-config.sxp >>$LOGFILE 2>&1
-  sed -i -e "s/(dom0-min-mem 256)/(dom0-min-mem 196)/" /etc/xen/xend-config.sxp >>$LOGFILE 2>&1
-  sed -i -e "s/.*XENCONSOLED_LOG_GUESTS.*/XENCONSOLED_LOG_GUESTS=yes/" /etc/sysconfig/xend >>$LOGFILE 2>&1
-  service xend restart >>$LOGFILE 2>&1
-  error_check
-  echo "$(date) - Customized xen configuration" | tee -a $LOGFILE
-  # Edit the libvirt.conf file
-  echo "$(date) - Configuring libvirt " | tee -a $LOGFILE
-  sed -i -e 's/.*unix_sock_group.*/unix_sock_group = "eucalyptus"/' /etc/libvirt/libvirtd.conf >>$LOGFILE 2>&1
-  sed -i -e 's/.*unix_sock_ro_perms.*/unix_sock_ro_perms = "0777"/' /etc/libvirt/libvirtd.conf >>$LOGFILE 2>&1
-  sed -i -e 's/.*unix_sock_rw_perms.*/unix_sock_rw_perms = "0770"/' /etc/libvirt/libvirtd.conf >>$LOGFILE 2>&1
-  service libvirtd restart  >>$LOGFILE 2>&1
-  error_check
-  echo "$(date) - Customized libvirt configuration" | tee -a $LOGFILE
-  # Enable 256 loop devices
-  if [ ! -f /etc/modprobe.d/eucalyptus-loop ] ; then
-    echo "options loop max_loop=256" > /etc/modprobe.d/eucalyptus-loop
-    if lsmod | grep ^loop ; then
-      rmmod loop
-    fi
-    modprobe loop
-    echo "$(date) - Loop module customized" | tee -a $LOGFILE
-  else
-    echo "$(date) - Loop module already customized" | tee -a $LOGFILE
-  fi
-  if ! grep -E '^NM_CONTROLLED=' /etc/sysconfig/network-scripts/ifcfg-${NC_PUBINTERFACE} > /dev/null ; then
-    echo 'NM_CONTROLLED=no' >> /etc/sysconfig/network-scripts/ifcfg-${NC_PUBINTERFACE}
-  else
-    sed -i -e 's/NM_CONTROLLED=.*/NM_CONTROLLED=no/' /etc/sysconfig/network-scripts/ifcfg-${NC_PUBINTERFACE}
-  fi
-  if ! grep -E '^ONBOOT=' /etc/sysconfig/network-scripts/ifcfg-${NC_PUBINTERFACE} > /dev/null ; then
-    echo 'ONBOOT=yes' >> /etc/sysconfig/network-scripts/ifcfg-${NC_PUBINTERFACE}
-  else
-    sed -i -e 's/ONBOOT=.*/ONBOOT=yes/' /etc/sysconfig/network-scripts/ifcfg-${NC_PUBINTERFACE}
-  fi
-  service network restart
-;;
-"6")
+# Make some configuration changes based on user input
   NC_BRIDGE="br0"
   sed -i -e "s/.*VNET_BRIDGE=\".*\"/VNET_BRIDGE=\"$NC_BRIDGE\"/" /etc/eucalyptus/eucalyptus.conf
   sed -i -e "s/#CREATE_NC_LOOP_DEVICES.*/CREATE_NC_LOOP_DEVICES=256/" /etc/eucalyptus/eucalyptus.conf
@@ -369,8 +301,6 @@ case "$ELVERSION" in
     fi
   fi
   error_check
-;;
-esac
 
 sed -i -e '/^-A FORWARD -j REJECT/d' /etc/sysconfig/iptables
 iptables-restore < /etc/sysconfig/iptables
@@ -390,9 +320,3 @@ echo ""
 echo "After all Node Controllers are installed and configured, install and configure"
 echo "your Frontend server."
 echo ""
-if [ $ELVERSION -eq 5 ] ; then
-  echo "Your system needs to reboot to complete configuration changes."
-  read -p "Press [Enter] key to reboot..."
-  shutdown -r now
-fi
-
