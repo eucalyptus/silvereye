@@ -124,17 +124,17 @@ sleep 5
 eval export PUBLIC_INTERFACE=$( awk -F= '/^VNET_PUBINTERFACE/ { print $2 }' /etc/eucalyptus/eucalyptus.conf )
 PUB_BRIDGE=$( brctl show | awk "/$PUBLIC_INTERFACE/ { print \$1 }" )
 if [ -n "$PUB_BRIDGE" ]; then
-  export PUBLIC_IP_ADDRESS=$( ip addr show $PUB_BRIDGE | awk -F"[\t /]*" '/inet.*global/ { print $3 }' )
+  export PUBLIC_IP_ADDRESS=$( ip -4 addr show $PUB_BRIDGE | awk -F"[\t /]*" '/inet.*global/ { print $3 }' )
 else
-  export PUBLIC_IP_ADDRESS=$( ip addr show $PUBLIC_INTERFACE | awk -F"[\t /]*" '/inet.*global/ { print $3 }' )
+  export PUBLIC_IP_ADDRESS=$( ip -4 addr show $PUBLIC_INTERFACE | awk -F"[\t /]*" '/inet.*global/ { print $3 }' )
 fi
 
 eval export PRIVATE_INTERFACE=$( awk -F= '/^VNET_PRIVINTERFACE/ { print $2 }' /etc/eucalyptus/eucalyptus.conf )
 PRIV_BRIDGE=$( brctl show | awk "/$PRIVATE_INTERFACE/ { print \$1 }" )
 if [ -n "$PRIV_BRIDGE" ]; then
-  export PRIVATE_IP_ADDRESS=$( ip addr show $PRIV_BRIDGE | awk -F"[\t /]*" '/inet.*global/ { print $3 }' )
+  export PRIVATE_IP_ADDRESS=$( ip -4 addr show $PRIV_BRIDGE | awk -F"[\t /]*" '/inet.*global/ { print $3 }' )
 else
-  export PRIVATE_IP_ADDRESS=$( ip addr show $PRIVATE_INTERFACE | awk -F"[\t /]*" '/inet.*global/ { print $3 }' )
+  export PRIVATE_IP_ADDRESS=$( ip -4 addr show $PRIVATE_INTERFACE | awk -F"[\t /]*" '/inet.*global/ { print $3 }' )
 fi
 
 echo "Using public IP $PUBLIC_IP_ADDRESS and private IP $PRIVATE_IP_ADDRESS to" | tee -a $LOGFILE
@@ -205,7 +205,7 @@ euca-modify-property -p ${CLUSTER_NAME}.storage.blockstoragemanager=overlay
 chkconfig eucalyptus-cloud on
 
 if rpm -q eucalyptus-nc ; then
-  NC_IP_ADDRESS=$( ip addr show | awk -F"[\t /]*" "/inet.*global.*br0/ { print \$3 }" )
+  NC_IP_ADDRESS=$( ip -4 addr show | awk -F"[\t /]*" "/inet.*global.*br0/ { print \$3 }" )
   echo "Registering local NC at $NC_IP_ADDRESS" | tee -a $LOGFILE
   euca_conf --register-nodes $NC_IP_ADDRESS
 fi
