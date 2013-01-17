@@ -303,10 +303,6 @@ class SilvereyeBuilder(yum.YumBase):
     self.logger.info("Created %s directory structure" % self.builddir)
     self.logger.info("Using %s for downloads" % downloadUrl)
 
-    # write merged comps
-    self.comps.add(os.path.join(self.basedir, 'comps.xml'))
-    open(os.path.join(self.builddir, 'comps.xml'), 'w').write(self.comps.xml())
-
     fileset = set(['.discinfo',
                    'EULA',
                    'GPL',
@@ -497,6 +493,7 @@ class SilvereyeBuilder(yum.YumBase):
       newrepo = yum.yumRepo.YumRepository(repoid)
       newrepo.enabled = 1
       newrepo.gpgcheck = 0  # This is because we aren't installing the key.  Fix this.
+      newrepo.enablegroups = 1
       if mirrorlist:
         newrepo.mirrorlist = mirrorlist
       else:
@@ -535,7 +532,7 @@ class SilvereyeBuilder(yum.YumBase):
     elif self.eucaversion == "nightly":
       self.setupRepo('eucalyptus', 'eucalyptus-release',
                      ignoreHostCfg=True,
-                     baseurl="http://downloads.eucalyptus.com/software/eucalyptus/nightly/3.2/centos/%s/%s/" % 
+                     baseurl="http://downloads.eucalyptus.com/software/eucalyptus/nightly/3.3/centos/%s/%s/" % 
                      (self.distroversion, self.conf.yumvar['basearch']))
     else:
       self.setupRepo('eucalyptus', 'eucalyptus-release',
@@ -570,6 +567,7 @@ class SilvereyeBuilder(yum.YumBase):
                  'udftools', 'unzip', 'wireless-tools', 'livecd-tools',
                  'eucalyptus', 'eucalyptus-admin-tools', 'eucalyptus-cc',
                  'eucalyptus-cloud', 'eucalyptus-common-java',
+                 'eucalyptus-console', 'eucadw',
                  'eucalyptus-gl', 'eucalyptus-nc', 'eucalyptus-sc',
                  'eucalyptus-walrus', 'eucalyptus-release' ])
 
@@ -582,9 +580,6 @@ class SilvereyeBuilder(yum.YumBase):
 
     # Useful tools
     rpms.update(['tcpdump', 'strace', 'man'])
-
-    if self.eucaversion in [ 'nightly', '3.2' ]:
-      rpms.update(['eucalyptus-console', 'eucadw'])
 
     if self.distroversion == "6":
       rpms.update(['ntpdate', 'libvirt-client', 'elrepo-release', 
@@ -642,6 +637,13 @@ class SilvereyeBuilder(yum.YumBase):
   # Create a repository
   def createRepo(self):
     compsfile = os.path.join(self.builddir, 'comps.xml')
+
+    # write merged comps
+    self.comps.add(os.path.join(self.basedir, 'comps.xml'))
+    if not self.comps.has_group('eucalyptus-cloud-controller'):
+        raise Exception, "eucalyptus-cloud-controller not found in comps"
+    open(compsfile, 'w').write(self.comps.xml())
+
     self.logger.info("Creating repodata")
     retcode = subprocess.call(['createrepo', '-u', 'media://' + self.datestamp, '-o', self.imgdir,
                      '-g', compsfile, self.imgdir ],
