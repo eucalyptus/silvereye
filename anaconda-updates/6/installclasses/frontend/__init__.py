@@ -88,6 +88,7 @@ class InstallClass(silvereye.InstallClass):
         anaconda.backend.selectPackage("unzip")
         anaconda.backend.selectPackage("livecd-tools")
         anaconda.backend.selectPackage("firefox")
+        anaconda.backend.selectPackage("nagios")
 
         # For 3.2 and later
         anaconda.backend.selectPackage("eucalyptus-console")

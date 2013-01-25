@@ -61,7 +61,8 @@ class InstallClass(installclass.BaseInstallClass):
     def setGroupSelection(self, anaconda):
         for pkg in [ 'epel-release', 'elrepo-release',
                      'euca2ools-release', 'eucalyptus-release',
-                     'ntp', 'tcpdump', 'strace', 'man' ]:
+                     'ntp', 'tcpdump', 'strace', 'man',
+                     'nrpe', 'nagios-plugins-all' ]:
             anaconda.backend.selectPackage(pkg)
 
     def setInstallData(self, anaconda):

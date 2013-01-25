@@ -585,6 +585,9 @@ class SilvereyeBuilder(yum.YumBase):
       rpms.update(['ntpdate', 'libvirt-client', 'elrepo-release', 
                    'iwl6000g2b-firmware', 'sysfsutils'])
 
+    # Monitoring
+    rpms.update(['nrpe', 'nagios-plugins-all', 'nagios'])
+
     # Download the base rpms
     self.logger.info("Retrieving Packages")
 
