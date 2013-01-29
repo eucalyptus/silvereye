@@ -104,7 +104,7 @@ class InstallClass(installclass.BaseInstallClass):
             import livecd
             return livecd.LiveCDCopyBackend
         else:
-            return yuminstall.YumBackend
+            return EucaYumBackend
 
     def postAction(self, anaconda):
         installclass.BaseInstallClass.postAction(self, anaconda)
@@ -125,3 +125,50 @@ fi
 
     def __init__(self):
         installclass.BaseInstallClass.__init__(self)
+
+class EucaYumBackend(yuminstall.YumBackend):
+    def doBackendSetup(self, anaconda):
+        yuminstall.YumBackend.doBackendSetup(self, anaconda)
+
+        """
+        repo setup.
+         * If repo name define in kickstart, skip it.
+         * Else, check methodstr, and then:
+           - If cdrom / hd / something-else-local *and* the desired
+             repo is present as a subdirectory, use it
+           - Otherwise, use upstream mirrorlist / baseurl
+        """
+        enabledRepos = self.ayum.repos.listEnabled()
+        
+        # TODO: Use macros here
+        repoMap = { "eucalyptus": { "baseurl": "http://downloads.eucalyptus.com/software/eucalyptus/3.2/centos/6/x86_64/" },
+                    "euca2ools": { "baseurl": "http://downloads.eucalyptus.com/software/euca2ools/2.1/centos/6/x86_64/" },
+                    "elrepo": { "baseurl": "http://elrepo.org/linux/elrepo/el6/x86_64/" },
+                    "epel": { "mirrorlist": "http://mirrors.fedoraproject.org/mirrorlist?repo=epel-6&arch=x86_64" },
+                    "updates": { "mirrorlist": "http://mirrorlist.centos.org/?release=6&arch=x86_64&repo=updates" },
+                  }
+
+        for repoName in repoMap.keys():
+            if repoName in [ x.name for x in enabledRepos ]:
+                continue
+
+            newRepoObj = yuminstall.AnacondaYumRepo(repoName)
+            newRepoObj.basecachedir = self.ayum.conf.cachedir
+            newRepoObj.name = repoName
+
+            # TODO: leverage task_gui applyFuncs code???
+            if anaconda.methodstr and anaconda.methodstr.startswith("cdrom:") \
+               or anaconda.mediaDevice:
+                newRepoObj.baseurl = "file://" + os.path.join(self.ayum.tree, repoName)   
+            else:
+                newRepoObj.baseurl = repoMap[repoName].get("baseurl", [])
+                newRepoObj.mirrorlist = repoMap[repoName].get("mirrorlist", None)
+            self.ayum.repos.add(newRepoObj)
+            newRepoObj.enable()
+            self.doRepoSetup(anaconda, thisrepo=newRepoObj.id, 
+                                       fatalerrors=False)
+            self.doSackSetup(anaconda, thisrepo=newRepoObj.id,
+                                       fatalerrors=False)
+            self.ayum.doGroupSetup()
+            self.ayum.doMacros()
+

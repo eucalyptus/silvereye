@@ -567,7 +567,7 @@ class SilvereyeBuilder(yum.YumBase):
                  'udftools', 'unzip', 'wireless-tools', 'livecd-tools',
                  'eucalyptus', 'eucalyptus-admin-tools', 'eucalyptus-cc',
                  'eucalyptus-cloud', 'eucalyptus-common-java',
-                 'eucalyptus-console', 'eucadw',
+                 'eucalyptus-console', 
                  'eucalyptus-gl', 'eucalyptus-nc', 'eucalyptus-sc',
                  'eucalyptus-walrus', 'eucalyptus-release' ])
 
@@ -629,12 +629,27 @@ class SilvereyeBuilder(yum.YumBase):
         raise Exception('repo %s not configured' % repoid)
 
     self.logger.info("Downloading packages")
-    releasever = []
-    if self.distroversion == "6":
-      releasever = [ '--releasever', '6' ]
-    subprocess.call(['yumdownloader', '-c', yumconf,
+
+    if not os.path.exists(os.path.join(self.imgdir, 'base')):
+        os.symlink(self.pkgdir, os.path.join(self.imgdir, 'base'))
+    for path in [ 'euca2ools', 'epel', 'elrepo', 'eucalyptus', 'updates' ]:
+        if not os.path.exists(os.path.join(self.imgdir, path)):
+            os.mkdirs(os.path.join(self.imgdir, path))
+
+    subprocess.call([os.path.join(self.basedir, 'scripts', 'yumdownloader'), 
+                     '-c', yumconf,
                      '--resolve', '--installroot', self.builddir,
-                     '--destdir', self.pkgdir ] + releasever + list(rpms),
+                     '--destdir', self.imgdir, '--splitbyrepo',
+                     '--releasever', '6' ] + list(rpms),
+                      stdout=self.cmdout, stderr=self.cmdout) 
+
+    # Call again to dep close Packages dir from 6.3 base
+    subprocess.call([os.path.join(self.basedir, 'scripts', 'yumdownloader'), 
+                     '-c', yumconf,
+                     '--disablerepo', 'updates',
+                     '--resolve', '--installroot', self.builddir,
+                     '--destdir', self.imgdir, '--splitbyrepo',
+                     '--releasever', '6' ] + list(rpms),
                       stdout=self.cmdout, stderr=self.cmdout) 
 
   # Create a repository
@@ -649,11 +664,26 @@ class SilvereyeBuilder(yum.YumBase):
 
     self.logger.info("Creating repodata")
     retcode = subprocess.call(['createrepo', '-u', 'media://' + self.datestamp, '-o', self.imgdir,
-                     '-g', compsfile, self.imgdir ],
+                     '-g', compsfile, 
+                     '-x', 'eucalyptus/*',
+                     '-x', 'euca2ools/*',
+                     '-x', 'epel/*',
+                     '-x', 'elrepo/*',
+                     '-x', 'base/*',
+                     '-x', 'updates/*',
+                     self.imgdir ],
                       stdout=self.cmdout, stderr=self.cmdout)
     if retcode:
       raise Exception("creatrepo failed!!")
-    self.logger.info("Repo created")
+
+    self.logger.info("Base repo created")
+    for repo in [ 'eucalyptus', 'euca2ools', 'epel', 'elrepo', 'updates' ]:
+        retcode = subprocess.call(['createrepo', 
+                                   '-o', os.path.join(self.imgdir, repo),
+                                   os.path.join(self.imgdir, repo) ],
+                                   stdout=self.cmdout, stderr=self.cmdout)
+        if retcode:
+            raise Exception("creatrepo failed!!")
 
   # Create boot logo
   def getLogo(self):
