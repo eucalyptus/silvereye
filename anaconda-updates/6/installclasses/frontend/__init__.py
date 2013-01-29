@@ -82,9 +82,10 @@ class InstallClass(silvereye.InstallClass):
         silvereye.InstallClass.setGroupSelection(self, anaconda)
         map(lambda x: anaconda.backend.selectGroup(x),
                       ["core", "eucalyptus-cloud-controller",
-                       "eucalyptus-storage-controller", "eucalyptus-walrus",
-                       "eucalyptus-cluster-controller",
                        'X Window System', 'Desktop', 'Fonts'])
+        anaconda.backend.selectPackage("eucalyptus-sc")
+        anaconda.backend.selectPackage("eucalyptus-walrus")
+        anaconda.backend.selectPackage("eucalyptus-cc")
         anaconda.backend.selectPackage("unzip")
         anaconda.backend.selectPackage("livecd-tools")
         anaconda.backend.selectPackage("firefox")
@@ -92,7 +93,6 @@ class InstallClass(silvereye.InstallClass):
 
         # For 3.2 and later
         anaconda.backend.selectPackage("eucalyptus-console")
-        anaconda.backend.selectPackage("eucadw")
 
     def setInstallData(self, anaconda):
         silvereye.InstallClass.setInstallData(self, anaconda)

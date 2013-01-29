@@ -51,7 +51,7 @@ class InstallClass(frontend.InstallClass):
  
     def setGroupSelection(self, anaconda):
         frontend.InstallClass.setGroupSelection(self, anaconda)
-        anaconda.backend.selectGroup("eucalyptus-node-controller")
+        anaconda.backend.selectPackage("eucalyptus-nc")
 
     def setInstallData(self, anaconda):
         frontend.InstallClass.setInstallData(self, anaconda)

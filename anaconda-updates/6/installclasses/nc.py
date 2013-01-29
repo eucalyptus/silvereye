@@ -46,8 +46,8 @@ class InstallClass(silvereye.InstallClass):
  
     def setGroupSelection(self, anaconda):
         silvereye.InstallClass.setGroupSelection(self, anaconda)
-        map(lambda x: anaconda.backend.selectGroup(x),
-                      ["core", "eucalyptus-node-controller"])
+        anaconda.backend.selectGroup("core")
+        anaconda.backend.selectPackage("eucalyptus-nc")
 
     def setInstallData(self, anaconda):
         silvereye.InstallClass.setInstallData(self, anaconda)
