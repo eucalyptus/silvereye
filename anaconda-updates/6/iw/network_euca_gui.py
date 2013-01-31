@@ -54,7 +54,7 @@ class NetworkWindow(InstallWindow):
         self.hostname = network.getDefaultHostname(anaconda)
 
         # load the UI
-        (self.xml, self.align) = gui.getGladeWidget("network.glade",
+        (self.xml, self.align) = gui.getGladeWidget("network_euca.glade",
                                                     "network_align")
         self.icon = self.xml.get_widget("icon")
         self.hostnameEntry = self.xml.get_widget("hostnameEntry")

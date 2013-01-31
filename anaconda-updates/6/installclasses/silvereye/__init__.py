@@ -99,6 +99,9 @@ class InstallClass(installclass.BaseInstallClass):
         anaconda.dispatch.skipStep("partition")
         # anaconda.dispatch.skipStep("parttype")
 
+        from gui import stepToClass
+        stepToClass['network'] = ('network_euca_gui', 'NetworkWindow')
+
     def getBackend(self):
         if flags.livecdInstall:
             import livecd
