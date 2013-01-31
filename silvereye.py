@@ -131,6 +131,8 @@ class SilvereyeCLI():
                         help='URL from which to download the kexec loader initramfs')
     parser.add_argument('--release', action="store_true",
                         help='Indicates that this is an official product release')
+    parser.add_argument('--no-iso', action="store_true",
+                        help='Just build updates.img.  Skip ISO generation')
     self.parser = parser
 
   def run(self):
@@ -141,7 +143,7 @@ class SilvereyeCLI():
                   'eucaversion', 'isofile', 'updatesurl',
                   'cachedir', 'verbose', 'quiet', 'noclean',
                   'kexec_kernel_url', 'kexec_initramfs_url',
-                  'release'
+                  'release', 'no_iso'
                 ]:
       value = getattr(parsedargs, attr)
       if value is not None:
@@ -158,12 +160,16 @@ class SilvereyeCLI():
     builder = SilvereyeBuilder(**kwargs) 
     builder.distroCheck()
     builder.installBuildDeps()
+    builder.makeUpdatesImg()
+
+    if parsedargs.no_iso:
+        return
+
     builder.getIsolinuxFiles()
     builder.getImageFiles()
     builder.createKickstartFiles()
     builder.setupRequiredRepos(repoMap=repoMap)
     builder.downloadPackages()
-    builder.makeUpdatesImg()
     builder.makeProductImg()
     builder.createRepo()
     builder.createBootLogo()
@@ -187,7 +193,7 @@ class SilvereyeBuilder(yum.YumBase):
 
     self.datestamp = str(time.time())
 
-    self.eucaversion = kwargs.get('eucaversion', '3.1')
+    self.eucaversion = kwargs.get('eucaversion', '3.2')
 
     hostdistroname, hostdistroversion = get_distro_and_version()
     self.distroname = kwargs.get('distroname', hostdistroname)
@@ -280,11 +286,12 @@ class SilvereyeBuilder(yum.YumBase):
       return
 
     if os.geteuid() != 0:
-      self.logger.error("Missing build dependencies: " + ' '.join([ x.name for x in matching ]))
+      self.logger.error("Missing build dependencies: " + ' '.join([ x[0].name for x in matching if x[0].name in deps ]))
       raise Exception("Missing build dependencies cannot be installed as a non-root user")
     
     for (po, matched_value) in matching:
-      self.install(po)
+      if po.name in deps:
+        self.install(po)
     self.buildTransaction()
     self.processTransaction()
 
@@ -372,6 +379,7 @@ class SilvereyeBuilder(yum.YumBase):
     # Fix anaconda bugs to allow copying files from CD during %post
     # scripts in EL5, and network prompting in EL6
     updatesdir = os.path.join(self.builddir, 'updates')
+    mkdir(os.path.join(self.imgdir, 'images'))
     updatesimg = os.path.join(self.imgdir, 'images', 'updates.img')
 
     if self.distroversion == "5":
@@ -425,16 +433,6 @@ class SilvereyeBuilder(yum.YumBase):
       self.getAmiCreator(updatesdir)
       shutil.copyfile(os.path.join(self.basedir, 'scripts', 'eucalyptus-nc-config.sh'),
                       os.path.join(scriptsDir, 'eucalyptus-nc-config.sh'))
-
-      # TODO: Remove this, I think, because we no longer rely on kickstart for EL6
-      f = open('/usr/lib/anaconda/kickstart.py', 'r')
-      g = open(os.path.join(updatesdir, 'kickstart.py'), 'w')
-      for line in f.readlines():
-        if re.match('.*dispatch.skipStep.*network.*', line):
-          continue
-        g.write(line)
-      f.close()
-      g.close()
 
       filelist = []
       def appender(ign, dir, files):
