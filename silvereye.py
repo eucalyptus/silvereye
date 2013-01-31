@@ -631,8 +631,7 @@ class SilvereyeBuilder(yum.YumBase):
     if not os.path.exists(os.path.join(self.imgdir, 'base')):
         os.symlink(self.pkgdir, os.path.join(self.imgdir, 'base'))
     for path in [ 'euca2ools', 'epel', 'elrepo', 'eucalyptus', 'updates' ]:
-        if not os.path.exists(os.path.join(self.imgdir, path)):
-            os.mkdirs(os.path.join(self.imgdir, path))
+        mkdir(os.path.join(self.imgdir, path))
 
     subprocess.call([os.path.join(self.basedir, 'scripts', 'yumdownloader'), 
                      '-c', yumconf,
@@ -714,17 +713,30 @@ class SilvereyeBuilder(yum.YumBase):
     return tmplogo
 
   def getIcon(self):
+    tmp_icon = os.path.join(self.builddir, 'tmp_icon.png')
     icon = os.path.join(self.builddir, 'icon.png')
 
     if os.path.exists(icon):
       return icon
 
-    # TODO: grab the eucalyptus "E" from somewhere
-    # if self.release:
-    # ...
-    # else:
-    logo = self.getLogo()
-    subprocess.call(['convert', '-resize', '48x45!', logo, icon ])
+    if self.release:
+      cookieJar = cookielib.LWPCookieJar()
+      user, password = self.getWikiCreds()
+      txdata = urlencode(dict([('u', user), ('p', password),
+                               ('id', 'start'), ('do', 'login'),
+                              ]))
+      txheaders = { 'User-agent' : 'Mozilla/4.0 (compatible; Silvereye 3; Linux)'}
+      opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookieJar))
+      req = urllib2.Request('https://wiki.eucalyptus-systems.com/doku.php' , txdata, txheaders)
+      handle = opener.open(req)
+      data = handle.read()
+      icon_url='https://wiki.eucalyptus-systems.com/lib/exe/fetch.php?w=50&media=brand:euc-017_favicon_fnl.jpg'
+      handle = opener.open(icon_url)
+      open(tmp_icon, 'w').write(handle.read())
+    else:
+      tmp_icon = self.getLogo()
+
+    subprocess.call(['convert', '-resize', '48x45!', tmp_icon, icon ])
     return icon
 
   def getWikiCreds(self):
