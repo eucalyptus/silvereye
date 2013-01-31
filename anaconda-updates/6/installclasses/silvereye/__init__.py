@@ -157,8 +157,11 @@ class EucaYumBackend(yuminstall.YumBackend):
             newRepoObj.name = repoName
 
             # TODO: leverage task_gui applyFuncs code???
-            if anaconda.methodstr and anaconda.methodstr.startswith("cdrom:") \
-               or anaconda.mediaDevice:
+            if ((anaconda.methodstr and \
+                  (anaconda.methodstr.startswith("cdrom:") or \
+                   anaconda.methodstr.startswith("nfsiso:"))) or \
+                anaconda.mediaDevice) and \
+                os.path.exists(os.path.join(self.ayum.tree, repoName)):
                 newRepoObj.baseurl = "file://" + os.path.join(self.ayum.tree, repoName)   
             else:
                 newRepoObj.baseurl = repoMap[repoName].get("baseurl", [])
