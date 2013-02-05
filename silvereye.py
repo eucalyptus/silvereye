@@ -159,7 +159,9 @@ class SilvereyeCLI():
 
     builder = SilvereyeBuilder(**kwargs) 
     builder.distroCheck()
+
     builder.installBuildDeps()
+
     builder.makeUpdatesImg()
 
     if parsedargs.no_iso:
@@ -199,6 +201,7 @@ class SilvereyeBuilder(yum.YumBase):
     self.distroname = kwargs.get('distroname', hostdistroname)
     self.distroversion = kwargs.get('distroversion', hostdistroversion)
     self.updatesurl = kwargs.get('updatesurl', None)
+    self.no_iso = kwargs.get('no_iso', False)
 
     self.cmdout = None
     if kwargs.get('quiet', False):
@@ -266,13 +269,14 @@ class SilvereyeBuilder(yum.YumBase):
 
   def installBuildDeps(self):
     # Install silvereye dependencies
-    deps = set([ 'yum-utils', 'createrepo',
-                 'ImageMagick', 'syslinux' ])
+    deps = set([ 'ImageMagick' ])
+    if not self.no_iso:
+      deps.update([ 'yum-utils', 'createrepo', 'syslinux' ])
 
-    if self.distroversion == "5":
-      deps.update([ 'anaconda-runtime' ])
-    else:
-      deps.update([ 'syslinux-perl', 'anaconda' ])
+      if self.distroversion == "5":
+        deps.update([ 'anaconda-runtime' ])
+      else:
+        deps.update([ 'syslinux-perl', 'anaconda' ])
 
     for x in list(deps):
       if self.isPackageInstalled(x):
@@ -417,8 +421,7 @@ class SilvereyeBuilder(yum.YumBase):
         shutil.rmtree(updatesdir)
       shutil.copytree(os.path.join(self.basedir, 'anaconda-updates', self.distroversion), updatesdir)
       pixmapDir = os.path.join(updatesdir, 'pixmaps')
-      if not os.path.exists(pixmapDir):
-          os.mkdir(pixmapDir)
+      mkdir(pixmapDir)
       shutil.copyfile(self.getLogo(), os.path.join(pixmapDir, 'splash.png'))
       if not os.path.exists(os.path.join(pixmapDir, 'progress_first.png')):
           os.link(os.path.join(pixmapDir, 'splash.png'),
