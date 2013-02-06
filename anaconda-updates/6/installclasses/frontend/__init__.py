@@ -145,6 +145,10 @@ class InstallClass(silvereye.InstallClass):
                         '/mnt/sysimage/etc/init.d/eucalyptus-setup')
         os.chmod('/mnt/sysimage/etc/init.d/eucalyptus-setup', 0770)
 
+        shutil.copyfile('/tmp/updates/scripts/register_cloud_start',
+                        '/mnt/sysimage/usr/local/sbin/register_cloud_start')
+        os.chmod('/mnt/sysimage/usr/local/sbin/register_cloud_start', 0755)
+
         os.mkdir('/mnt/sysimage/tmp/img')
         # EKI
         shutil.copyfile('/tmp/updates/scripts/vmlinuz-kexec',

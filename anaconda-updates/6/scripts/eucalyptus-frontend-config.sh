@@ -265,4 +265,4 @@ Icon=gnome-fs-bookmark
 Name[en_US]=Eucalyptus User Console
 CONSOLESHORTCUT
 
-
+/usr/local/sbin/register_cloud_start

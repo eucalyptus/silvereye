@@ -23,6 +23,7 @@ from flags import flags
 import iutil
 import os
 import re
+import shutil
 import types
 from kickstart import AnacondaKSScript
 from storage.partspec import *
@@ -111,6 +112,9 @@ class InstallClass(installclass.BaseInstallClass):
 
     def postAction(self, anaconda):
         installclass.BaseInstallClass.postAction(self, anaconda)
+
+        shutil.copyfile('/tmp/updates/scripts/silvereye-release',
+                        '/mnt/sysimage/etc/silvereye-release')
 
         postscriptlines ="""
 if [ -e /etc/libvirt/qemu/networks/autostart/default.xml ]; then

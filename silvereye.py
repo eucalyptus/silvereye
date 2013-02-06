@@ -378,6 +378,7 @@ class SilvereyeBuilder(yum.YumBase):
         self.logger.info("Downloading " + downloadUrl + 'images/' + x)
         chunked_download(downloadUrl + 'images/' + x,
                          os.path.join(self.imgdir, 'images', x))
+
   def makeUpdatesImg(self):
     sudo = []
     # Fix anaconda bugs to allow copying files from CD during %post
@@ -433,6 +434,7 @@ class SilvereyeBuilder(yum.YumBase):
       if not os.path.exists(scriptsDir):
           os.mkdir(scriptsDir)
       self.getKexecFiles(scriptsDir)
+      self.writeMetadata(scriptsDir)
       self.getAmiCreator(updatesdir)
       shutil.copyfile(os.path.join(self.basedir, 'scripts', 'eucalyptus-nc-config.sh'),
                       os.path.join(scriptsDir, 'eucalyptus-nc-config.sh'))
@@ -448,6 +450,17 @@ class SilvereyeBuilder(yum.YumBase):
       zipball = gzip.GzipFile(updatesimg, 'w')
       zipball.write(p.communicate(input='\n'.join(filelist))[0])
       zipball.close()
+
+  def writeMetadata(self, path):
+    # Write some info to identify this installer
+    f = open(os.path.join(path, 'silvereye-release'), 'w')
+    commit = "unknown"
+    if os.path.exists(os.path.join(self.basedir, '.git')):
+      p = subprocess.Popen(['git','rev-parse','HEAD'], stdout=subprocess.PIPE)
+      commit = p.communicate()[0].strip()
+    f.write('commit=%s\n' % commit)
+    f.write('version=%s\n' % self.eucaversion) 
+    f.close()
 
   def createKickstartFiles(self):
     # Create kickstart files
