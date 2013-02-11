@@ -5,9 +5,9 @@ import sys
 import gettext
 _ = lambda x: gettext.ldgettext("anaconda", x)
 
-from sce.euca_tui import EucaBaseGrid
-from sce.configfile import ConfigFile
-from sce import euca_backend
+from system_config_eucalyptus.euca_tui import EucaBaseGrid
+from system_config_eucalyptus.configfile import ConfigFile
+from system_config_eucalyptus import euca_backend
 
 class FrontendInstallWindow:
     def __call__(self, screen, anaconda):

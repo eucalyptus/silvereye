@@ -133,6 +133,8 @@ class SilvereyeCLI():
                         help='Indicates that this is an official product release')
     parser.add_argument('--no-iso', action="store_true",
                         help='Just build updates.img.  Skip ISO generation')
+    parser.add_argument('--sce',
+                        help='Path to system-config-eucalyptus files')
     self.parser = parser
 
   def run(self):
@@ -143,7 +145,7 @@ class SilvereyeCLI():
                   'eucaversion', 'isofile', 'updatesurl',
                   'cachedir', 'verbose', 'quiet', 'noclean',
                   'kexec_kernel_url', 'kexec_initramfs_url',
-                  'release', 'no_iso'
+                  'release', 'no_iso', 'sce',
                 ]:
       value = getattr(parsedargs, attr)
       if value is not None:
@@ -202,6 +204,7 @@ class SilvereyeBuilder(yum.YumBase):
     self.distroversion = kwargs.get('distroversion', hostdistroversion)
     self.updatesurl = kwargs.get('updatesurl', None)
     self.no_iso = kwargs.get('no_iso', False)
+    self.sce = kwargs.get('sce', None)
 
     self.cmdout = None
     if kwargs.get('quiet', False):
@@ -436,6 +439,7 @@ class SilvereyeBuilder(yum.YumBase):
       self.getKexecFiles(scriptsDir)
       self.writeMetadata(scriptsDir)
       self.getAmiCreator(updatesdir)
+      self.getSCE(updatesdir)
       shutil.copyfile(os.path.join(self.basedir, 'scripts', 'eucalyptus-nc-config.sh'),
                       os.path.join(scriptsDir, 'eucalyptus-nc-config.sh'))
 
@@ -495,6 +499,23 @@ class SilvereyeBuilder(yum.YumBase):
   def getAmiCreator(self, dest):
     chunked_download('https://raw.github.com/eucalyptus/ami-creator/master/ami_creator/ami_creator.py', 
                      os.path.join(dest, 'ami_creator.py'))
+
+  def getSCE(self, dest):
+    if self.sce:
+      if not os.path.exists(self.sce):
+        raise Exception("Specified path %s does not exist" % self.sce)
+      if os.path.exists(os.path.join(self.sce, 'src')):
+        self.sce = os.path.join(self.sce, 'src')
+    else:
+      os.system('git clone https://github.com/eucalyptus/system-config-eucalyptus.git %s' %
+                os.path.join(self.builddir, 'system-config-eucalyptus'))
+      self.sce = os.path.join(self.builddir, 'system-config-eucalyptus', 'src')
+      
+    mkdir(os.path.join(dest, 'system_config_eucalyptus'))
+    for x in glob.glob(os.path.join(self.sce, '*.py')):
+      shutil.copyfile(x, os.path.join(dest, 'system_config_eucalyptus', os.path.basename(x)))
+    shutil.copyfile(os.path.join(self.sce, 'euca_gui.glade'),
+                    os.path.join(dest, 'ui', 'euca_gui.glade'))
 
   # Configure yum repositories
   def setupRepo(self, repoid, pkgname=None, ignoreHostCfg=False, mirrorlist=None, baseurl=None):
