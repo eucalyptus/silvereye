@@ -92,7 +92,7 @@ class InstallClass(installclass.BaseInstallClass):
         # Unskip memcheck
         anaconda.dispatch.skipStep("memcheck", skip = 0)
         anaconda.dispatch.skipStep("protectstorage", skip = 0)
-        anaconda.dispatch.skipStep("tasksel",permanent=1)
+        anaconda.dispatch.skipStep("tasksel",skip=1,permanent=1)
         anaconda.dispatch.skipStep("firewall")
         anaconda.dispatch.skipStep("group-selection")
         anaconda.dispatch.skipStep("filtertype")
@@ -100,8 +100,9 @@ class InstallClass(installclass.BaseInstallClass):
         anaconda.dispatch.skipStep("partition")
         # anaconda.dispatch.skipStep("parttype")
 
-        from gui import stepToClass
-        stepToClass['network'] = ('network_euca_gui', 'NetworkWindow')
+        if anaconda.id.displayMode == "g":
+          from gui import stepToClass
+          stepToClass['network'] = ('network_euca_gui', 'NetworkWindow')
 
     def getBackend(self):
         if flags.livecdInstall:

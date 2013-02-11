@@ -55,7 +55,8 @@ def imageProgress(data, callback_data=None):
 
     (pkg, cur, tot) = m.groups()[0:3]
     callback_data.progressWindow.set(100 * int(cur) / int(tot))
-    callback_data.status.set_text('Installing %s (%s of %s)' % (pkg, cur, tot))
+    if callback_data.status is not None:
+        callback_data.status.set_text('Installing %s (%s of %s)' % (pkg, cur, tot))
 
 class InstallClass(silvereye.InstallClass):
     # name has underscore used for mnemonics, strip if you dont need it
@@ -128,6 +129,13 @@ class InstallClass(silvereye.InstallClass):
 
     def setSteps(self, anaconda):
         silvereye.InstallClass.setSteps(self, anaconda)
+        if anaconda.id.displayMode == 'g':
+          from gui import stepToClass
+          stepToClass["frontend"] = ("frontend_gui", "FrontendInstallWindow")
+        else:
+          from text import stepToClasses
+          stepToClasses["frontend"] = ("frontend_text", "FrontendInstallWindow")
+
         anaconda.dispatch.skipStep("frontend", skip = 0)
 
     def postAction(self, anaconda):
@@ -202,11 +210,13 @@ chkconfig eucalyptus-setup on
                                       type=KS_SCRIPT_POST)
         postscript.run(anaconda.rootPath, flags.serial, anaconda.intf)
 
-        # XXX: Refactor this so that we can do text installs
-        import gtk
-        pkgstatus = gtk.Label("Preparing to install...")
-        w.window.child.add(pkgstatus)
-        pkgstatus.show()
+        # TODO: Add status line for text mode
+        pkgstatus = None
+        if anaconda.id.displayMode == 'g':
+            import gtk
+            pkgstatus = gtk.Label("Preparing to install...")
+            w.window.child.add(pkgstatus)
+            pkgstatus.show()
 
         messages = '/root/ami-creation.log'
         rc = iutil.execWithCallback('/bin/sh' , ['-c', 'cd /tmp/img; /tmp/ami_creator.py -m -c /tmp/ks-centos6.cfg'],
