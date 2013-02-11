@@ -62,21 +62,19 @@ def vtCheck(anaconda):
             return
   
     while 1:
+        buttons = [_("_Exit"),]
+        if flags.debug: 
+            buttons.append(_("_Install anyway"))
         rc = anaconda.intf.messageWindow( _("Warning! Virtualization not supported"),
                                       _("It appears that this system's CPUs do not "
-                                        "support virtualization.  The Eucalyptus "
-                                        "Node Controller will not function properly."),
+                                        "support virtualization, or that this feature"
+                                        "is disabled in the BIOS configuration.  The Eucalyptus "
+                                        "Node Controller will not function properly."
+                                       ),
                                    type="custom", custom_icon="warning",
-                                   custom_buttons=[_("_Exit"), _("_Install anyway")])
+                                   custom_buttons=buttons)
         if not rc:
-            msg =  _("Your system will now be rebooted...")
-            buttons = [_("_Back"), _("_Reboot")]
-            rc = anaconda.intf.messageWindow( _("Warning! Virtualization not supported"),
-                                     msg,
-                                     type="custom", custom_icon="warning",
-                                     custom_buttons=buttons)
-            if rc:
-                sys.exit(0)
+            sys.exit(0)
         else:
             break
 
