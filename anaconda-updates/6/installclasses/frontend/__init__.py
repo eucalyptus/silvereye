@@ -136,7 +136,8 @@ class InstallClass(silvereye.InstallClass):
           from text import stepToClasses
           stepToClasses["frontend"] = ("frontend_text", "FrontendInstallWindow")
 
-        anaconda.dispatch.skipStep("frontend", skip = 0)
+        if not anaconda.isKickstart or not os.path.exists('/tmp/eucalyptus.conf'):
+            anaconda.dispatch.skipStep("frontend", skip = 0)
 
     def postAction(self, anaconda):
         silvereye.InstallClass.postAction(self, anaconda)
