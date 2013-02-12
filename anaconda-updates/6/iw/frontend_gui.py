@@ -64,8 +64,10 @@ class FrontendInstallWindow (InstallWindow, FrontendWindow):
                                     custom_icon="error",
                                     custom_buttons=[_("_Back")])
 
-            self.anaconda.dispatch.gotoPrev()
-            self.icw.setScreen ()
+            anaconda.dispatch.gotoPrev()
+            self.intf.icw.setScreen ()
+
+        self.win = self.intf.icw.window
 
         return FrontendWindow.getScreen(self, euca_conf=euca_conf, roles=roles)
 
@@ -78,6 +80,8 @@ class FrontendInstallWindow (InstallWindow, FrontendWindow):
 
     def getNext (self):
         euca_conf = FrontendWindow.getNext(self)
+        if not euca_conf:
+            self.validationError()
         anaconda = self.ics.getICW().anaconda
 
         # someday we may support Managed or System mode
