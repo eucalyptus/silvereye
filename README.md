@@ -1,76 +1,82 @@
-Silvereye is an automated installer for Eucalyptus 3.1.
+== About Silvereye ==
 
-Running the script silvereye.sh will generate a CentOS-based ISO.  Booting from this ISO
-will allow you to install either a frontend (cloud controller + cluster controller + storage
-controller + walrus) or a node controller.  We recommend installing node controllers first 
-so that the frontend can then attach to them.
+Silvereye is an automated installer for Eucalyptus 3.  It is intended for
+quick cloud deployments for demos, testing, or PoCs.  It is *not*
+intended for production deployments, nor is it supported by Eucalyptus.
 
-NOTE #1: Eucalyptus runs its own DHCP server. It can play nicely with yours *if* you tell your current
-DHCP server to ignore all mac addresses that start with D0:0D.  (And don't worry; Eucalyptus will
-only respond to mac addresses that start with D0:0D.)
+Silvereye targets three very simple cloud topologies:
 
-NOTE #2: Silvereye is not supported.  At all.  If you use it, there are ABSOLUTELY NO GUARANTEES that 
-it won't burn down your house, steal your pickup truck, or throw your mother into a wood-chipper.
+* One "front end" with a single NIC, and one or more node controllers with 
+a single NIC.
+* One "front end" with two NICs, "public" and "private", and one or more
+node controllers on the "private" subnet.
+* A "cloud-in-a-box", where the front end and a node controller reside on
+the same machine, with a single NIC.
+
+In all of these scenarios, silvereye uses the "MANAGED-NOVLAN" networking mode
+in Eucalyptus, to avoid requirements for specific network switch hardware.
+
+Silvereye does not yet support any other network modes, nor does it support
+the separation of the front end's components.
+
+== Prerequisites == 
+
+For the latest official Eucalyptus hardware requirements, please see
+http://www.eucalyptus.com/docs/3.2/ig/system_requirements.html
+
+For demo purposes, smaller configurations are sometimes possible, though not
+recommended.  If the target system has less than 2 GB of RAM or less than 
+35 GB of disk space, it is likely that the install will not produce a usable
+cloud.  Other notes about the installation:
+
+1. Systems which run as node controllers (including "cloud-in-a-box" systems)
+*must* have CPUs which support Intel-VT or AMD-V, and this support must be
+enabled in the BIOS.
+2. Eucalyptus runs its own DHCP server. It can coexist with another DHCP
+server *if* the other server is configured to ignore all mac addresses that 
+start with D0:0D.  (Eucalyptus will _only_ respond to mac addresses that start
+with D0:0D.)
+3. Each system must have a statically assigned IP address.  This can be a
+DHCP reservation, but it must not change. IP address changes require database
+modifications which are currently unsupported.
+4. The front end and node controllers must be connected to the same subnet; it
+is okay for the front end to have a separate "public" and "private" network,
+where the node controllers should be on the "private" network.
+5. There must be a set of free IP addresses on the same network as the front
+end's "public" interface.   
 
 More documentation on Eucalyptus configuration can be found at:
 
 http://www.eucalyptus.com/eucalyptus-cloud/documentation
 
-* * * * *
+== Downloading an official ISO ==
 
-INSTALLATION FROM SILVEREYE ISO:
+Silvereye ISOs (rebranded as "FastStart" for official Eucalyptus releases)
+can be downloaded from http://downloads.eucalyptus.com/software/faststart/
 
-(NOTE: these are *draft* instructions.  We recommend following them to the letter, but even then, 
-you may run into issues.  Patches welcome.)
+New features are being added in each release, so please reference the 
+version-specific "FastStart Guide" at http://www.eucalyptus.com/docs
 
-STEP 1: Sort out your network!  Rule number one for running a private cloud: Know Thy Network.
+== Building an ISO ==
 
-Here's what you need:
+Running the silvereye.py script will generate a CentOS 6 based ISO.  This
+build script has a large set of command-line options, all of which are
+documented in the help text.
 
-* Static IP addresses for your physical machines (frontend and each Node Controller).  
-* A safe IP range for your Eucalyptus instances.
-* If these addresses are all NATted, that's a-ok!
+The script requires that several packages be installed on your build system:
 
-Note that you can get all of these with a traditional at-home router setup.  I myself use a 
-Linksys 4-port router plugged into my cable modem.
+* python-argparse (This comes from EPEL, so you need to configure this
+repository first.  See 
+http://fedoraproject.org/wiki/EPEL#How_can_I_use_these_extra_packages.3F )
+* ImageMagick
+* syslinux-perl
+* anaconda (this may no longer be needed)
+* git (unless the --sce option is used)
 
-STEP 2: Sort out your hardware!  You need at least two systems that support virtualization, 
-and have 100GB of disk, 8Gig of ram, an Ethernet NIC, and a DVD drive (or a way to boot an ISO
-such as a PXE server).  The systems can be laptops, desktops, servers, or whatever.  One system 
-is for the frontend; all the rest are for Node Controllers.
+*NOTE*: If you don't want to build a full ISO, see the --no-iso option,
+which builds only the updates.img file.
 
-STEP 3: Get your silvereye ISO.  Go get it from here and burn it to DVD: 
+== Reporting Bugs ==
 
-http://downloads.eucalyptus.com/software/contrib/silvereye/
+Please report bugs at https://eucalyptus.atlassian.net/browse/INST
 
-**NOTE: If you're doing a Cloud-in-a-Box install, go directly to STEP 6, as the node
-controller will be configured automatically.**
-
-STEP 4: Boot your first machine, which will be a node controller, with your Silvereye DVD.  When you get 
-to the pretty Eucalyptus boot prompt, you will see several options, the first of which should be 
-"Install CentOS 6 with Eucalyptus Node Controller."  Pick that option and hit enter.  You will then be 
-taken through a standard CentOS install.  You should be able to safely choose all default options.  
-After CentOS successfully installs, reboot.
-
-STEP 5: when the machine reboots, log in as root and the Eucalyptus node controller configuration 
-script will begin.  Configure your network settings for this machine, using the static IP addresses
-you set aside before installation.  (Note: if you have a laptop, we advise against setting up the
-wireless network card; use the built-in ethernet NIC.)  You should be able to select defaults all the 
-way through.  When you're done, you should have a functioning Node Controller!  
-
-Repeat steps 4 and 5 as often as needed, once for each NC.  Be sure to note the IP addresses of your NCs; 
-you will need them later when you set up your frontend.
-
-STEP 6: Boot your frontend with the Silvereye DVD.  Go through the same install process for Centos 6, 
-as you did for the NC in Step Four.
-
-STEP 7: When the machine reboots, log in as root and the Eucalyptus frontend configration script will 
-begin.  Configure network settings with your static IP address, and accept all defaults. 
-
-Type "yes" when prompted to build an EMI. (If you need to put in the installer disc again, put it in.)  
-Type "small" when asked about root filesystem size for the default image (recommend small for the first 
-time out.)  Install graphical front end if you like.  Reboot.
-
-STEP 8: Test your install!  From your front-end machine, bring up terminal.  
-To set up your credentials, run "source /root/credentials/admin/eucarc".  You should then be able
-to type "euca-describe-images" and see images in your cloud!
