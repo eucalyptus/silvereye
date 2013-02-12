@@ -86,19 +86,22 @@ class InstallClass(installclass.BaseInstallClass):
                                      grow=True, asVol=False))
 
         storage.autoPartitionRequests = autorequests
+        storage.doAutoPart = True
 
     def setSteps(self, anaconda):
         installclass.BaseInstallClass.setSteps(self, anaconda)
         # Unskip memcheck
         anaconda.dispatch.skipStep("memcheck", skip = 0)
-        anaconda.dispatch.skipStep("protectstorage", skip = 0)
+        if not anaconda.isKickstart:
+            anaconda.dispatch.skipStep("protectstorage", skip = 0)
         anaconda.dispatch.skipStep("tasksel",skip=1,permanent=1)
         anaconda.dispatch.skipStep("firewall")
-        anaconda.dispatch.skipStep("group-selection")
+        anaconda.dispatch.skipStep("group-selection",permanent=1)
         anaconda.dispatch.skipStep("filtertype")
         anaconda.dispatch.skipStep("filter")
         anaconda.dispatch.skipStep("partition")
-        # anaconda.dispatch.skipStep("parttype")
+        if anaconda.isKickstart:
+            anaconda.dispatch.skipStep("parttype")
 
         if anaconda.id.displayMode == "g":
           from gui import stepToClass
