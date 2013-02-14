@@ -265,4 +265,20 @@ Icon=gnome-fs-bookmark
 Name[en_US]=Eucalyptus User Console
 CONSOLESHORTCUT
 
+cat >/etc/motd <<MOTD
+User Console URL: https://${CLOUD_PUBLIC_IP_ADDRESS}:8888/
+
+User Credentials:
+  * Account:  demo
+  * Username: admin
+  * Password: demo
+
+Admin Console URL: https://${CLOUD_PUBLIC_IP_ADDRESS}:8443
+
+Admin Credentials:
+  * Account:  eucalyptus
+  * Username: admin
+  * Password: admin
+MOTD
+
 /usr/local/sbin/register_cloud_start
