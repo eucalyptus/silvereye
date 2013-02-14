@@ -20,6 +20,7 @@
 import gtk
 import os
 import glob
+import time
 
 from firstboot.config import *
 from firstboot.constants import *
@@ -73,16 +74,39 @@ class moduleClass(Module):
             if node not in current_nodes:
                 current_nodes.append(node)
 
+            """
+            Put our ssh key on all of the nodes, so running several commands
+            is easier.
+            """
+            p = subprocess.Popen(['ssh', '-oStrictHostKeyChecking=no', 
+                                  node, 'cat - >> /root/.ssh/authorized_keys'],
+                                 stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE, 
+                                 env={ 'PATH': os.environ['PATH'],
+                                       'DISPLAY': display,
+                                       'SSH_ASKPASS': '/usr/libexec/openssh/gnome-ssh-askpass' } )
+
+            p.communicate(input=open('/root/.ssh/id_rsa.pub', 'r').read())
+
+            # Key sync.  This is what euca_conf --register-nodes does.
             cmd = ['rsync', '-e', 'ssh -oStrictHostKeyChecking=no', '-az'] + file_paths
             cmd.append('root@%s:%s' % (node, key_dir))
             p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE,
-                                      env={ 'PATH': os.environ['PATH'],
-                                            'DISPLAY': display,
-                                            'SSH_ASKPASS': '/usr/libexec/openssh/gnome-ssh-askpass' } )
+                                      stderr=subprocess.PIPE)
             out, err = p.communicate()
             if p.returncode:
-                # TODO: display errors in a message window
+                self._showErrorMessage(err)
+                self.nodeIP.grab_focus()
+                return RESULT_FAILURE
+
+            # Time sync.  TODO: Use NTP to keep things in sync
+            p = subprocess.Popen(['ssh', '-oStrictHostKeyChecking=no', node,
+                                  'date "+%%T" -s %s' % time.strftime("%H:%M:%S%z")],
+                                  stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE)
+            out, err = p.communicate()
+            if p.returncode:
                 self._showErrorMessage(err)
                 self.nodeIP.grab_focus()
                 return RESULT_FAILURE
