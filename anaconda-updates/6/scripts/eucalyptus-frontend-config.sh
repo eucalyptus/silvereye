@@ -46,21 +46,22 @@ for FEIP in `ip addr show |grep inet |grep global|awk -F"[\t /]*" '{ print $3 }'
 done
 
 function configure_frontend {
-# Modify /etc/hosts if hostname is not resolvable
-ping -c 1 `hostname` > /dev/null
-if [ $? -ne 0 ] ; then
-  EUCACONF_PUBINTERFACE=$( awk -F= '/^VNET_PUBINTERFACE/ { gsub("\"", "", $2); print $2 }' /etc/eucalyptus/eucalyptus.conf )
-  CLOUD_PUBLIC_IP_ADDRESS=$( ip addr show | awk -F"[\t /]*" "/inet.*global.*$EUCACONF_PUBINTERFACE/ { print \$3 }" )
-  # If VNET_PUBINTERFACE is a bridge
-  if [ -z $CLOUD_PUBLIC_IP_ADDRESS ] ; then
-    CLOUD_PUBLIC_IP_ADDRESS=$( ip addr show | awk -F"[\t /]*" "/inet.*global.*br0/ { print \$3 }" )
-  fi
-  CLOUD_HOSTNAME=`hostname`
-  CLOUD_SHORTHOSTNAME=`hostname | cut -d. -f1`
+eval export PUBLIC_INTERFACE=$( awk -F= '/^VNET_PUBINTERFACE/ { print $2 }' /etc/eucalyptus/eucalyptus.conf )
+PUB_BRIDGE=$( brctl show | awk "/$PUBLIC_INTERFACE/ { print \$1 }" )
+if [ -n "$PUB_BRIDGE" ]; then
+  export PUBLIC_IP_ADDRESS=$( ip -4 addr show $PUB_BRIDGE | awk -F"[\t /]*" '/inet.*global/ { print $3 }' )
+else
+  export PUBLIC_IP_ADDRESS=$( ip -4 addr show $PUBLIC_INTERFACE | awk -F"[\t /]*" '/inet.*global/ { print $3 }' )
+fi
+
+CLOUD_HOSTNAME=$( hostname )
+CLOUD_SHORTHOSTNAME=${CLOUD_HOSTNAME%%.*}
+IP=$( getent hosts $CLOUD_HOSTNAME )
+if [ -z "$IP" ] ; then
   if [ $CLOUD_HOSTNAME = $CLOUD_SHORTHOSTNAME ] ; then
-    echo "$CLOUD_PUBLIC_IP_ADDRESS ${CLOUD_HOSTNAME}" >> /etc/hosts
+    echo "$PUBLIC_IP_ADDRESS ${CLOUD_HOSTNAME}" >> /etc/hosts
   else
-    echo "$CLOUD_PUBLIC_IP_ADDRESS ${CLOUD_HOSTNAME} ${CLOUD_SHORTHOSTNAME}" >> /etc/hosts
+    echo "$PUBLIC_IP_ADDRESS ${CLOUD_HOSTNAME} ${CLOUD_SHORTHOSTNAME}" >> /etc/hosts
   fi
 fi
 
@@ -120,14 +121,6 @@ if [ $fail ] ; then
 fi
 
 sleep 5
-
-eval export PUBLIC_INTERFACE=$( awk -F= '/^VNET_PUBINTERFACE/ { print $2 }' /etc/eucalyptus/eucalyptus.conf )
-PUB_BRIDGE=$( brctl show | awk "/$PUBLIC_INTERFACE/ { print \$1 }" )
-if [ -n "$PUB_BRIDGE" ]; then
-  export PUBLIC_IP_ADDRESS=$( ip -4 addr show $PUB_BRIDGE | awk -F"[\t /]*" '/inet.*global/ { print $3 }' )
-else
-  export PUBLIC_IP_ADDRESS=$( ip -4 addr show $PUBLIC_INTERFACE | awk -F"[\t /]*" '/inet.*global/ { print $3 }' )
-fi
 
 eval export PRIVATE_INTERFACE=$( awk -F= '/^VNET_PRIVINTERFACE/ { print $2 }' /etc/eucalyptus/eucalyptus.conf )
 PRIV_BRIDGE=$( brctl show | awk "/$PRIVATE_INTERFACE/ { print \$1 }" )
@@ -211,7 +204,7 @@ if rpm -q eucalyptus-nc ; then
 fi
 
 # Fix user console CLC IP
-sed -i -e "s/^clchost:.*/clchost: $CLOUD_PUBLIC_IP_ADDRESS/" /etc/eucalyptus-console/console.ini
+sed -i -e "s/^clchost:.*/clchost: $PUBLIC_IP_ADDRESS/" /etc/eucalyptus-console/console.ini
 service eucalyptus-console restart
 
 # authorize ssh for default security group
@@ -240,7 +233,7 @@ cat >/etc/skel/Desktop/Eucalyptus.desktop <<DESKTOPSHORTCUT
 Encoding=UTF-8
 Name=Eucalyptus Web Admin
 Type=Link
-URL=https://${CLOUD_PUBLIC_IP_ADDRESS}:8443/
+URL=https://${PUBLIC_IP_ADDRESS}:8443/
 Icon=gnome-fs-bookmark
 Name[en_US]=Eucalyptus Web Admin
 DESKTOPSHORTCUT
@@ -260,20 +253,20 @@ cat >/etc/skel/Desktop/Eucalyptus_Console.desktop <<CONSOLESHORTCUT
 Encoding=UTF-8
 Name=Eucalyptus User Console
 Type=Link
-URL=https://${CLOUD_PUBLIC_IP_ADDRESS}:8888/
+URL=https://${PUBLIC_IP_ADDRESS}:8888/
 Icon=gnome-fs-bookmark
 Name[en_US]=Eucalyptus User Console
 CONSOLESHORTCUT
 
 cat >/etc/motd <<MOTD
-User Console URL: https://${CLOUD_PUBLIC_IP_ADDRESS}:8888/
+User Console URL: https://${PUBLIC_IP_ADDRESS}:8888/
 
 User Credentials:
   * Account:  demo
   * Username: admin
   * Password: demo
 
-Admin Console URL: https://${CLOUD_PUBLIC_IP_ADDRESS}:8443
+Admin Console URL: https://${PUBLIC_IP_ADDRESS}:8443
 
 Admin Credentials:
   * Account:  eucalyptus
