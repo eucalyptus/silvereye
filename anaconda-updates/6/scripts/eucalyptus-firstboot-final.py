@@ -30,6 +30,7 @@ class moduleClass(Module):
                             "on this system, or you can use a web browser to connect "
                             "from a remote system.  Please make note of the following "
                             "login credentials:\n\n") + open('/etc/motd', 'r').read())
+        label.set_line_wrap(True)
         label.set_alignment(0.0, 0.5)
         label.set_size_request(500, -1)
 
