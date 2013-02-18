@@ -171,9 +171,11 @@ function get_credentials {
     mkdir -p /root/credentials/admin | tee -a $LOGFILE
     cd /root/credentials/admin
     while [ -z "$EUARE_URL" -o -z "$S3_URL" ]; do
-      rm admin.zip
-      euca_conf --get-credentials admin.zip | tee -a $LOGFILE
-      unzip -o admin.zip | tee -a $LOGFILE
+      if [ -e admin.zip ]; then rm admin.zip; fi
+      euca_conf --get-credentials admin.zip 2>&1 | tee -a $LOGFILE
+      if [ -s admin.zip ]; then
+        unzip -o admin.zip | tee -a $LOGFILE
+      fi
       source eucarc
       sleep 5
     done
