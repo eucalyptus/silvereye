@@ -91,7 +91,6 @@ class FrontendInstallWindow (InstallWindow, FrontendWindow):
 
         if not self.colocated_nc:
             privifcfg = anaconda.id.network.netdevices[euca_conf['VNET_PRIVINTERFACE']]
-            privifcfg.set(("NM_CONTROLLED", "no"))
             privifcfg.set(("NOZEROCONF", "true"))
 
         if self.colocated_nc or netmode == "MANAGED":
@@ -111,7 +110,9 @@ class FrontendInstallWindow (InstallWindow, FrontendWindow):
                 bridgeifcfg.set(("NETMASK", "255.255.255.255"))
             elif netmode == "MANAGED":
                 # connect the private interface to a bridge
+                # XXX: this breaks network installs!
                 privifcfg.set(("BRIDGE", "br0"))
+                privifcfg.set(("NM_CONTROLLED", "no"))
 
                 for attr in [ "BOOTPROTO", "IPADDR", "NETMASK" ]:  
                     value = privifcfg.get(attr)
