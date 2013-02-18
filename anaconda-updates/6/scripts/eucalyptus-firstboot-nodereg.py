@@ -79,7 +79,7 @@ class moduleClass(Module):
             is easier.
             """
             p = subprocess.Popen(['ssh', '-oStrictHostKeyChecking=no', 
-                                  node, 'cat - >> /root/.ssh/authorized_keys'],
+                                  node, 'mkdir /root/.ssh; cat - >> /root/.ssh/authorized_keys'],
                                  stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE, 
