@@ -259,14 +259,16 @@ Name[en_US]=Eucalyptus User Console
 CONSOLESHORTCUT
 
 cat >/etc/motd <<MOTD
-User Console URL: https://${PUBLIC_IP_ADDRESS}:8888/
+User Console URL (for managing instances, volumes, etc.):
+    https://${PUBLIC_IP_ADDRESS}:8888/
 
 User Credentials:
   * Account:  demo
   * Username: admin
   * Password: demo
 
-Admin Console URL: https://${PUBLIC_IP_ADDRESS}:8443
+Admin Console URL (for managing user accounts, VM types, etc.):
+    https://${PUBLIC_IP_ADDRESS}:8443
 
 Admin Credentials:
   * Account:  eucalyptus
