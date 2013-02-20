@@ -62,7 +62,7 @@ for f in $( isoinfo -J -R -i $ISO -f | grep '/isolinux' | grep -v ldlinux ); do
 done
 
 # Reference the disk image UUID in the boot options
-eval $( blkid /dev/sdb1 | cut -d: -f2 )
+eval $( blkid ${DEVNAME}1 | cut -d: -f2 )
 sed -e "s#initrd=initrd.img#initrd=initrd.img repo=hd:UUID=$UUID:/#" < $MTPT/syslinux/isolinux.cfg > $MTPT/syslinux/syslinux.cfg
 rm $MTPT/syslinux/isolinux.cfg
 
