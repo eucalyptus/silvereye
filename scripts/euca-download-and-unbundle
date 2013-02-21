@@ -1,0 +1,115 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# Software License Agreement (BSD License)
+#
+# Copyright (c) 2009-2011, Eucalyptus Systems, Inc.
+# All rights reserved.
+#
+# Redistribution and use of this software in source and binary forms, with or
+# without modification, are permitted provided that the following conditions
+# are met:
+#
+#   Redistributions of source code must retain the above
+#   copyright notice, this list of conditions and the
+#   following disclaimer.
+#
+#   Redistributions in binary form must reproduce the above
+#   copyright notice, this list of conditions and the
+#   following disclaimer in the documentation and/or other
+#   materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+#
+# Author: Neil Soman neil@eucalyptus.com
+#         Mitch Garnaat mgarnaat@eucalyptus.com
+#         Andy Grimm agrimm@eucalyptus.com
+
+import os
+import sys
+from boto.roboto.param import Param
+import euca2ools.commands.eucacommand
+import euca2ools.bundler
+from euca2ools.exceptions import NotFoundError, CommandFailed
+from boto.exception import S3ResponseError, S3CreateError
+from boto import s3
+from boto.s3.connection import S3Connection
+import urllib2, urllib
+
+class S3Unbundle(euca2ools.commands.eucacommand.EucaCommand):
+
+    Description = 'Unbundles a previously uploaded bundle.'
+    Options = [Param(name='manifest_path',
+                     short_name='m', long_name='manifest',
+                     optional=False, ptype='string',
+                     doc='Path to the manifest file.'),
+               Param(name='private_key_path',
+                     short_name='k', long_name='privatekey',
+                     optional=True, ptype='file',
+                     doc='Path to private key used to encrypt bundle.'),
+               Param(name='destination_dir',
+                     short_name='d', long_name='destination',
+                     optional=True, ptype='dir', default='.',
+                     doc="""Directory to store the image to.
+                     Defaults to the current directory."""),
+               Param(name='source_dir',
+                     short_name='s', long_name='source',
+                     optional=True, ptype='dir',
+                     doc="""Source directory for the bundled image parts.
+                     Defaults to manifest directory.""")]
+
+    def main(self):
+        if not self.source_dir:
+            self.source_dir = self.get_file_path(self.manifest_path)
+        if not self.private_key_path:
+            self.private_key_path = self.get_environ('EC2_PRIVATE_KEY')
+            if not os.path.isfile(self.private_key_path):
+                msg = 'Private Key not found: %s' % self.private_key_path
+                self.display_error_and_exit(msg)
+
+        bundler = euca2ools.bundler.Bundler(self)
+        bucket, mf = self.manifest_path.split('/', 1)
+        s3conn = self.make_connection_cli('s3')
+        mfbucket = s3conn.get_bucket(bucket)
+        mfkey = mfbucket.get_key(mf)
+        if not os.path.exists(bucket):
+            os.makedirs(bucket)
+        mfkey.get_contents_to_file(open(self.manifest_path, 'w'))
+
+        (parts, encrypted_key, encrypted_iv) = \
+            bundler.parse_manifest(self.manifest_path)
+        for x in parts:
+            partkey = mfbucket.get_key(x)
+            partkey.get_contents_to_file(open(os.path.join(bucket, x), 'w'))
+        image = bundler.assemble_parts(self.source_dir, self.destination_dir,
+                                       self.manifest_path, parts)
+        print 'Decrypting image'
+        decrypted_image = bundler.decrypt_image(image, encrypted_key,
+                                                encrypted_iv, self.private_key_path)
+        os.remove(image)
+        print 'Uncompressing image'
+        try:
+            bundler.untarzip_image(self.destination_dir, decrypted_image)
+        except NotFoundError:
+            sys.exit(1)
+        except CommandFailed:
+            sys.exit(1)
+        os.remove(decrypted_image)
+
+    def main_cli(self):
+        self.main()
+
+if __name__ == '__main__':
+    cmd = S3Unbundle()
+    cmd.main_cli()
+
