@@ -279,7 +279,7 @@ class SilvereyeBuilder(yum.YumBase):
       if self.distroversion == "5":
         deps.update([ 'anaconda-runtime' ])
       else:
-        deps.update([ 'syslinux-perl', 'anaconda' ])
+        deps.update([ 'syslinux-perl', 'genisoimage', 'isomd5sum' ])
 
     for x in list(deps):
       if self.isPackageInstalled(x):
@@ -294,7 +294,7 @@ class SilvereyeBuilder(yum.YumBase):
 
     if os.geteuid() != 0:
       self.logger.error("Missing build dependencies: " + ' '.join([ x[0].name for x in matching if x[0].name in deps ]))
-      raise Exception("Missing build dependencies cannot be installed as a non-root user")
+      raise Exception("Missing build dependencies ( %s ) cannot be installed as a non-root user" % ' '.join([ x[0].name for x in matching if x[0].name in deps ]))
     
     for (po, matched_value) in matching:
       if po.name in deps:
