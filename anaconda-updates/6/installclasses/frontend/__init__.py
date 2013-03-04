@@ -104,7 +104,8 @@ class InstallClass(silvereye.InstallClass):
                                                '8443:tcp',
                                                '8772:tcp',
                                                '8773:tcp',
-                                               '8774:tcp'])
+                                               '8774:tcp',
+                                               '8888:tcp'])
 
         if flags.cmdline.has_key("eucaconf"):
             try:

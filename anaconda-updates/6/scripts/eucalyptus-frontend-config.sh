@@ -105,9 +105,8 @@ echo "$(date)- Started services " | tee -a $LOGFILE
 # Prepare to register components
 echo "$(date)- Registering components " | tee -a $LOGFILE
 retries=0
-curl http://localhost:8443/ >/dev/null 2>&1
-while [ $? -ne 0 ] ; do
-  echo "Waiting for cloud controller to finish starting"
+while true; do
+  echo "Waiting for cloud controller to become ready."
     sleep 10
     retries=$(($retries + 1))
     if [ $retries -eq 30 ] ; then # this waits for 5 minutes
@@ -115,6 +114,7 @@ while [ $? -ne 0 ] ; do
       break
     fi
     curl http://localhost:8443/ >/dev/null 2>&1
+    if [ $? -ne 0 ] ; then break; fi
 done
 if [ $fail ] ; then
   echo "$(date)- Cloud controller failed to start after 5 minutes. Check in /var/log/eucalyptus/startup.log" |tee -a $LOGFILE
@@ -130,13 +130,24 @@ else
   export PRIVATE_IP_ADDRESS=$( ip -4 addr show $PRIVATE_INTERFACE | awk -F"[\t /]*" '/inet.*global/ { print $3 }' )
 fi
 
-echo "Using public IP $PUBLIC_IP_ADDRESS and private IP $PRIVATE_IP_ADDRESS to" | tee -a $LOGFILE
+echo -n "Using public IP $PUBLIC_IP_ADDRESS and private IP $PRIVATE_IP_ADDRESS to" | tee -a $LOGFILE
 echo "register components" | tee -a $LOGFILE
 
 # Register Walrus
 if [ `/usr/sbin/euca_conf --list-walruses 2>/dev/null | grep ^SERVICE |wc -l` -eq 0 ]
 then
-  /usr/sbin/euca_conf --register-walrus --partition walrus --host $PUBLIC_IP_ADDRESS --component=walrus | tee -a $LOGFILE 
+  retries=0
+  while true; do
+    echo "Waiting for cloud controller to become ready."
+      sleep 10
+      retries=$(($retries + 1))
+      if [ $retries -eq 30 ] ; then # this waits for 5 minutes
+        fail=true
+        break
+      fi
+      /usr/sbin/euca_conf --register-walrus --partition walrus --host $PUBLIC_IP_ADDRESS --component=walrus | tee -a $LOGFILE
+      if [ $? -ne 0 ] ; then break; fi
+  done
 else
   echo "Walrus already registered. Will not re-register walrus" | tee -a $LOGFILE
 fi
@@ -167,17 +178,21 @@ echo ""
 
 # Function to retrieve cloud admin credentials
 function get_credentials {
+  retries=12
   if [ ! -f /root/credentials/admin/eucarc ] ; then
     mkdir -p /root/credentials/admin | tee -a $LOGFILE
     cd /root/credentials/admin
-    while [ -z "$EUARE_URL" -o -z "$S3_URL" ]; do
+    while [ -z "$EUARE_URL" -o -z "$S3_URL" ] && [ $retries -gt 0 ]; do
       if [ -e admin.zip ]; then rm admin.zip; fi
       euca_conf --get-credentials admin.zip 2>&1 | tee -a $LOGFILE
       if [ -s admin.zip ]; then
         unzip -o admin.zip | tee -a $LOGFILE
       fi
-      source eucarc
+      if [ -f eucarc ]; then
+        source eucarc
+      fi
       sleep 5
+      retries=$(($retries - 1))
     done
 
     euca-add-keypair admin > admin.private
@@ -195,7 +210,9 @@ get_credentials
 
 euca-modify-property -p ${CLUSTER_NAME}.storage.blockstoragemanager=overlay
 
-/usr/local/sbin/install-unpacked-image.py -t /tmp/img -b centos6 -s "CentOS 6 demo" -a x86_64 2>&1 | tee -a $LOGFILE
+if [ -n "$S3_URL" ]; then
+  /usr/local/sbin/install-unpacked-image.py -t /tmp/img -b centos6 -s "CentOS 6 demo" -a x86_64 2>&1 | tee -a $LOGFILE
+fi
 
 chkconfig eucalyptus-cloud on
 
