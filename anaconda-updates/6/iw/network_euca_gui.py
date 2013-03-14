@@ -249,6 +249,7 @@ class NetworkWindow(InstallWindow):
             dev.unset("NETMASK")
             dev.unset("GATEWAY")
             dev.unset("PREFIX")
+            dev.set(("PERSISTENT_DHCLIENT", "yes"))
         dev.set(('ONBOOT', 'yes'))
 
         self.anaconda.id.network.setDNS(','.join(dnsservers), netif)

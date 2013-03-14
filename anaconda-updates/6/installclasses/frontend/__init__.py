@@ -92,6 +92,11 @@ class InstallClass(silvereye.InstallClass):
         anaconda.backend.selectPackage("firefox")
         anaconda.backend.selectPackage("nagios")
 
+        # Sigh, I guess we can't have nice things like wireless NICs
+        # https://eucalyptus.atlassian.net/browse/INST-124
+        anaconda.backend.deselectPackage("NetworkManager")
+        anaconda.backend.deselectPackage("NetworkManager-gnome")
+
         # For 3.2 and later
         anaconda.backend.selectPackage("eucalyptus-console")
 
