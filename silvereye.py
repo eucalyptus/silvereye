@@ -125,6 +125,8 @@ class SilvereyeCLI():
                         help='Set the base URL for your Eucalyptus repository')
     parser.add_argument('--euca2ools-repo',
                         help='Set the base URL for your Euca2ools repository')
+    parser.add_argument('--elrepo-repo',
+                        help='Set the base URL for your ELRepo repository')
     parser.add_argument('--kexec-kernel-url',
                         help='URL from which to download the kexec loader kernel')
     parser.add_argument('--kexec-initramfs-url',
@@ -153,7 +155,7 @@ class SilvereyeCLI():
 
     repoMap = dict()
     for attr in [ 'centos_repo', 'epel_repo', 'eucalyptus_repo',
-                  'euca2ools_repo'
+                  'euca2ools_repo', 'elrepo'
                 ]:
       value = getattr(parsedargs, attr)
       if value is not None:
