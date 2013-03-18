@@ -819,6 +819,7 @@ class SilvereyeBuilder(yum.YumBase):
   def makeProductImg(self):
     productdir = os.path.join(self.builddir, 'product')
     productimg = os.path.join(self.imgdir, 'images', 'product.img')
+    sudo = []
 
     mkdir(productdir)
     if os.geteuid() != 0:
