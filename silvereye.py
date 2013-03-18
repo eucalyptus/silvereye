@@ -550,7 +550,7 @@ class SilvereyeBuilder(yum.YumBase):
     # Install/configure ELRepo repository
     if repoMap.has_key('elrepo'):
       self.setupRepo('elrepo', 
-                     baseurl='%s/%s/%s/' % (repoMap['epel'],
+                     baseurl='%s/%s/%s/' % (repoMap['elrepo'],
                                             self.distroversion,
                                             self.conf.yumvar['basearch']),
                      ignoreHostCfg=True)
