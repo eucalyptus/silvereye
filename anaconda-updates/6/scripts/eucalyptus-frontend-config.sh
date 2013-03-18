@@ -114,7 +114,7 @@ while true; do
       break
     fi
     curl http://localhost:8443/ >/dev/null 2>&1
-    if [ $? -ne 0 ] ; then break; fi
+    if [ $? -eq 0 ] ; then break; fi
 done
 if [ $fail ] ; then
   echo "$(date)- Cloud controller failed to start after 5 minutes. Check in /var/log/eucalyptus/startup.log" |tee -a $LOGFILE
@@ -146,7 +146,7 @@ then
         break
       fi
       /usr/sbin/euca_conf --register-walrus --partition walrus --host $PUBLIC_IP_ADDRESS --component=walrus | tee -a $LOGFILE
-      if [ $? -ne 0 ] ; then break; fi
+      if [ $? -eq 0 ] ; then break; fi
   done
 else
   echo "Walrus already registered. Will not re-register walrus" | tee -a $LOGFILE
