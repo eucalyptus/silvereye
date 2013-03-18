@@ -155,7 +155,7 @@ class SilvereyeCLI():
 
     repoMap = dict()
     for attr in [ 'centos_repo', 'epel_repo', 'eucalyptus_repo',
-                  'euca2ools_repo', 'elrepo'
+                  'euca2ools_repo', 'elrepo_repo'
                 ]:
       value = getattr(parsedargs, attr)
       if value is not None:
