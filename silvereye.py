@@ -538,6 +538,16 @@ class SilvereyeBuilder(yum.YumBase):
       self.repos.add(newrepo)
 
   def setupRequiredRepos(self, repoMap={}):
+    # Install/configure CentOS repos
+    if repoMap.has_key('centos'):
+      self.setupRepo('base', baseurl='%s/%s/os/%s' % (repoMap['centos'], 
+                     self.distroversion, self.conf.yumvar['basearch']),
+                     ignoreHostCfg=True)
+      self.setupRepo('updates', baseurl='%s/%s/updates/%s' % (repoMap['centos'], 
+                     self.distroversion, self.conf.yumvar['basearch']),
+                     ignoreHostCfg=True)
+    # ...else we just keep the defaults
+
     # Install/configure EPEL repository
     if repoMap.has_key('epel'):
       self.setupRepo('epel', baseurl='%s/%s/%s/' % (repoMap['epel'], self.distroversion, self.conf.yumvar['basearch']),
