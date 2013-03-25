@@ -80,7 +80,6 @@ def get_distro_and_version():
   return m.groups()
 
 def chunked_download(url, dest):
-  self.logger.info("Downloading %s to %s" % (url, dest))
   req = urllib2.urlopen(url)
   CHUNK = 16 * 1024
   fp = open(dest, 'wb')
@@ -273,6 +272,10 @@ class SilvereyeBuilder(yum.YumBase):
       self.logger.error("This script must be run on CentOS version 5 or 6")
       sys.exit(2)
 
+  def chunked_download(self, url, dest):
+    self.logger.info("Downloading %s to %s" % (url, dest))
+    chunked_download(url, dest)
+
   def installBuildDeps(self):
     # Install silvereye dependencies
     deps = set([ 'ImageMagick' ])
@@ -347,8 +350,8 @@ class SilvereyeBuilder(yum.YumBase):
     for x in fileset:
       # we should probably compare timestamps here
       if not os.path.exists(os.path.join(self.imgdir, x)):
-        chunked_download(downloadUrl + x,
-                         os.path.join(self.imgdir, x))
+        self.chunked_download(downloadUrl + x,
+                              os.path.join(self.imgdir, x))
 
   def getImageFiles(self):
     repo = self.repos.getRepo('base')
@@ -380,8 +383,8 @@ class SilvereyeBuilder(yum.YumBase):
     for x in imgfileset:
       # we should probably compare timestamps here
       if not os.path.exists(os.path.join(self.imgdir, 'images', x)):
-        chunked_download(downloadUrl + 'images/' + x,
-                         os.path.join(self.imgdir, 'images', x))
+        self.chunked_download(downloadUrl + 'images/' + x,
+                              os.path.join(self.imgdir, 'images', x))
 
   def makeUpdatesImg(self):
     sudo = []
@@ -488,17 +491,17 @@ class SilvereyeBuilder(yum.YumBase):
   def getKexecFiles(self, dest):
     urlRE = re.compile(r'(https?|ftp)://')
     if urlRE.match(self.kexec_kernel):
-      chunked_download(self.kexec_kernel, os.path.join(dest, 'vmlinuz-kexec'))
+      self.chunked_download(self.kexec_kernel, os.path.join(dest, 'vmlinuz-kexec'))
     else:
       shutil.copyfile(self.kexec_kernel, os.path.join(dest, 'vmlinuz-kexec'))
 
     if urlRE.match(self.kexec_initramfs):
-      chunked_download(self.kexec_initramfs, os.path.join(dest, 'initramfs-kexec'))
+      self.chunked_download(self.kexec_initramfs, os.path.join(dest, 'initramfs-kexec'))
     else:
       shutil.copyfile(self.kexec_initramfs, os.path.join(dest, 'initramfs-kexec'))
 
   def getAmiCreator(self, dest):
-    chunked_download('https://raw.github.com/eucalyptus/ami-creator/master/ami_creator/ami_creator.py', 
+    self.chunked_download('https://raw.github.com/eucalyptus/ami-creator/master/ami_creator/ami_creator.py', 
                      os.path.join(dest, 'ami_creator.py'))
 
   def getSCE(self, dest):
@@ -756,7 +759,7 @@ class SilvereyeBuilder(yum.YumBase):
       open(tmplogo, 'w').write(handle.read())
     else:
       # AgI logo (CC BY-SA 3.0) via Activism1234 on Wikipedia
-      chunked_download(urllib2.Request('http://upload.wikimedia.org/wikipedia/commons/f/f5/Silver_Iodide_Balls_and_Sticks.png', None, { 'User-agent' : 'Mozilla/4.0 (compatible; Silvereye 3; Linux)'}),
+      self.chunked_download(urllib2.Request('http://upload.wikimedia.org/wikipedia/commons/f/f5/Silver_Iodide_Balls_and_Sticks.png', None, { 'User-agent' : 'Mozilla/4.0 (compatible; Silvereye 3; Linux)'}),
                       os.path.join(self.builddir, 'logo.png'))
       subprocess.call(['convert', os.path.join(self.builddir, 'logo.png'),
                        '-transparent', 'white', tmplogo])
