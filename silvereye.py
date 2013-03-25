@@ -663,7 +663,7 @@ class SilvereyeBuilder(yum.YumBase):
 
     yumrepodir = os.path.join(self.builddir, 'etc', 'yum.repos.d')
     mkdir(yumrepodir)
-    for repoid in ['base', 'epel', 'elrepo', 'eucalyptus', 'euca2ools']:
+    for repoid in ['base', 'updates', 'epel', 'elrepo', 'eucalyptus', 'euca2ools']:
       if self.repos.repos.has_key(repoid):
         if hasattr(self.repos.repos[repoid], 'cfg'):
           self.repos.repos[repoid].cfg.set(repoid, 'enabled', '1')
