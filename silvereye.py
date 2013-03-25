@@ -80,6 +80,7 @@ def get_distro_and_version():
   return m.groups()
 
 def chunked_download(url, dest):
+  self.logger.info("Downloading %s to %s" % (url, dest))
   req = urllib2.urlopen(url)
   CHUNK = 16 * 1024
   fp = open(dest, 'wb')
@@ -346,7 +347,6 @@ class SilvereyeBuilder(yum.YumBase):
     for x in fileset:
       # we should probably compare timestamps here
       if not os.path.exists(os.path.join(self.imgdir, x)):
-        self.logger.info("Downloading " + downloadUrl + x)
         chunked_download(downloadUrl + x,
                          os.path.join(self.imgdir, x))
 
@@ -380,7 +380,6 @@ class SilvereyeBuilder(yum.YumBase):
     for x in imgfileset:
       # we should probably compare timestamps here
       if not os.path.exists(os.path.join(self.imgdir, 'images', x)):
-        self.logger.info("Downloading " + downloadUrl + 'images/' + x)
         chunked_download(downloadUrl + 'images/' + x,
                          os.path.join(self.imgdir, 'images', x))
 
@@ -522,11 +521,13 @@ class SilvereyeBuilder(yum.YumBase):
   # Configure yum repositories
   def setupRepo(self, repoid, pkgname=None, ignoreHostCfg=False, mirrorlist=None, baseurl=None):
     if ignoreHostCfg and self.repos.repos.has_key(repoid):
+      self.logger.info("Removing host configuration for %s" % repoid)
       self.repos.delete(repoid)
 
     # We were checking for whether the release package was installed,
     # but that will only matter if we try to grab GPG keys
     if not self.repos.repos.has_key(repoid):
+      self.logger.info("Adding repo %s at %s" % (repoid, mirrorlist and mirrorlist or baseurl))
       newrepo = yum.yumRepo.YumRepository(repoid)
       newrepo.enabled = 1
       newrepo.gpgcheck = 0  # This is because we aren't installing the key.  Fix this.
