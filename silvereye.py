@@ -580,7 +580,7 @@ class SilvereyeBuilder(yum.YumBase):
                      baseurl='%s/%s/%s/' % (repoMap['eucalyptus'],
                                             self.distroversion,
                                             self.conf.yumvar['basearch']),
-                     ignoreHostConf=True)
+                     ignoreHostCfg=True)
     elif self.eucaversion == "nightly":
       self.setupRepo('eucalyptus', 'eucalyptus-release',
                      ignoreHostCfg=True,
