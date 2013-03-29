@@ -226,7 +226,7 @@ chkconfig eucalyptus-setup on
             pkgstatus.show()
 
         messages = '/root/ami-creation.log'
-        rc = iutil.execWithCallback('/bin/sh' , ['-c', 'cd /tmp/img; /tmp/ami_creator.py -m -c /tmp/ks-centos6.cfg'],
+        rc = iutil.execWithCallback('/bin/sh' , ['-c', 'cd /tmp/img; /tmp/ami_creator.py -c /tmp/ks-centos6.cfg'],
                                     stdin = messages, stdout = messages, stderr = messages,
                                     root = '/mnt/sysimage', callback=imageProgress, 
                                     callback_data=ImageProgress(w, pkgstatus))
