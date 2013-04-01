@@ -241,6 +241,13 @@ class SilvereyeBuilder(yum.YumBase):
                                       'https://raw.github.com/monolive/euca-single-kernel/master/examples/initrd-kexec_load')
 
     self.release = kwargs.get('release', False)
+    if self.release:
+        self.cookieJar = cookielib.LWPCookieJar('.cookiejar.lwp')
+        try:
+            self.cookieJar.load( ignore_discard=True )
+        except Exception, e:
+            self.cookieJar.save()
+
 
   @property 
   def pkgdir(self):
@@ -744,16 +751,8 @@ class SilvereyeBuilder(yum.YumBase):
       return tmplogo
 
     if self.release:
-      cookieJar = cookielib.LWPCookieJar()
-      user, password = self.getWikiCreds()
-      txdata = urlencode(dict([('u', user), ('p', password),
-                               ('id', 'start'), ('do', 'login'),
-                              ]))
-      txheaders = { 'User-agent' : 'Mozilla/4.0 (compatible; Silvereye 3; Linux)'}
-      opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookieJar))
-      req = urllib2.Request('https://wiki.eucalyptus-systems.com/doku.php' , txdata, txheaders)
-      handle = opener.open(req)
-      data = handle.read()
+      opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.cookieJar))
+      self.getWikiCreds(opener)
       logo_url='https://wiki.eucalyptus-systems.com/lib/exe/fetch.php?cache=&media=silvereye-logo.png'
       handle = opener.open(logo_url)
       open(tmplogo, 'w').write(handle.read())
@@ -774,16 +773,8 @@ class SilvereyeBuilder(yum.YumBase):
       return icon
 
     if self.release:
-      cookieJar = cookielib.LWPCookieJar()
-      user, password = self.getWikiCreds()
-      txdata = urlencode(dict([('u', user), ('p', password),
-                               ('id', 'start'), ('do', 'login'),
-                              ]))
-      txheaders = { 'User-agent' : 'Mozilla/4.0 (compatible; Silvereye 3; Linux)'}
-      opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookieJar))
-      req = urllib2.Request('https://wiki.eucalyptus-systems.com/doku.php' , txdata, txheaders)
-      handle = opener.open(req)
-      data = handle.read()
+      opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.cookieJar))
+      self.getWikiCreds(opener)
       icon_url='https://wiki.eucalyptus-systems.com/lib/exe/fetch.php?w=50&media=brand:euc-017_favicon_fnl.jpg'
       handle = opener.open(icon_url)
       open(tmp_icon, 'w').write(handle.read())
@@ -793,15 +784,25 @@ class SilvereyeBuilder(yum.YumBase):
     subprocess.call(['convert', '-resize', '48x45!', tmp_icon, icon ])
     return icon
 
-  def getWikiCreds(self):
-    import getpass
-    user = getpass.getuser()
-    prompt = 'Dokuwiki username [%s]: ' % user
-    newuser = raw_input(prompt)
-    if len(newuser):
-      user = newuser
-    password = getpass.getpass('DokuWiki password: ')
-    return (user, password)
+  def getWikiCreds(self, opener):
+    if len([ y for x,y in enumerate(self.cookieJar) 
+             if y.domain=='wiki.eucalyptus-systems.com' ]) < 2:
+      import getpass
+      user = getpass.getuser()
+      prompt = 'Dokuwiki username [%s]: ' % user
+      newuser = raw_input(prompt)
+      if len(newuser):
+        user = newuser
+      password = getpass.getpass('DokuWiki password: ')
+      txdata = urlencode(dict([('u', user), ('p', password),
+                               ('id', 'start'), ('do', 'login'),
+                              ]))
+      txheaders = { 'User-agent' : 'Mozilla/4.0 (compatible; Silvereye 3; Linux)'}
+      req = urllib2.Request('https://wiki.eucalyptus-systems.com/doku.php' , txdata, txheaders)
+      handle = opener.open(req)
+      data = handle.read()
+      self.cookieJar.save( ignore_discard=True )
+    return opener
    
   def createBootLogo(self):
     self.logger.info("Creating boot logo")
