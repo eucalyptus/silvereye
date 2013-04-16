@@ -42,6 +42,7 @@ from urllib import urlencode
 import urllib2
 import yum
 
+# Debugger boilerplate
 import bdb
 import traceback
 try:
@@ -69,6 +70,7 @@ def gen_except_hook(debugger_flag, debug_flag):
       sys.exit(1)
 
   return excepthook
+# End debugger boilerplate
 
 def mkdir(x):
   if not os.path.exists(x):
@@ -171,10 +173,10 @@ class SilvereyeCLI():
     if parsedargs.no_iso:
         return
 
+    builder.setupRequiredRepos(repoMap=repoMap)
     builder.getIsolinuxFiles()
     builder.getImageFiles()
     builder.createKickstartFiles()
-    builder.setupRequiredRepos(repoMap=repoMap)
     builder.downloadPackages()
     builder.makeProductImg()
     builder.createRepo()
@@ -185,8 +187,8 @@ class SilvereyeCLI():
 class SilvereyeBuilder(yum.YumBase):
   def __init__(self, *args, **kwargs):
     """
-    NOTE: Valid kwargs are builddir, distroname, distroversion,
-          isofile, and eucaversion
+    NOTE: Valid kwargs here are numerous.  All CLI long options are
+    also keywords here, except those for repo mapping
     """
     yum.YumBase.__init__(self)
 
@@ -242,10 +244,12 @@ class SilvereyeBuilder(yum.YumBase):
 
     self.release = kwargs.get('release', False)
     if self.release:
+        # Using a cookie jar here is required for automated builds
         self.cookieJar = cookielib.LWPCookieJar('.cookiejar.lwp')
         try:
             self.cookieJar.load( ignore_discard=True )
         except Exception, e:
+            self.logger.warn("Cookie jar did not exist.  Creating...")
             self.cookieJar.save()
 
 
@@ -605,7 +609,7 @@ class SilvereyeBuilder(yum.YumBase):
                      baseurl='%s/%s/%s/' % (repoMap['euca2ools'],
                                             self.distroversion,
                                             self.conf.yumvar['basearch']),
-                     ignoreHostConf=True)
+                     ignoreHostCfg=True)
     else:
       self.setupRepo('euca2ools', 'euca2ools-release',
                    baseurl="http://downloads.eucalyptus.com/software/euca2ools/2.1/centos/%s/%s/" % 
