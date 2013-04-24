@@ -214,6 +214,11 @@ if [ -n "$S3_URL" ]; then
   /usr/local/sbin/install-unpacked-image.py -t /tmp/img -b centos6 -s "CentOS 6 demo" -a x86_64 2>&1 | tee -a $LOGFILE
 fi
 
+pushd /usr/share/eucalyptus-load-balancer-image
+EMI_ID=$( eustore-install-image -b elb -a x86_64 -s loadbalancer -t eucalyptus-load-balancer-image.tgz | tee -a $LOGFILE | grep ^emi- )
+popd
+euca-modify-property -p loadbalancing.loadbalancer_emi=$EMI_ID
+
 chkconfig eucalyptus-cloud on
 
 if rpm -q eucalyptus-nc ; then

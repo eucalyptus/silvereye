@@ -87,6 +87,7 @@ class InstallClass(silvereye.InstallClass):
         anaconda.backend.selectPackage("eucalyptus-sc")
         anaconda.backend.selectPackage("eucalyptus-walrus")
         anaconda.backend.selectPackage("eucalyptus-cc")
+        anaconda.backend.selectPackage("eucalyptus-load-balancer-image")
         anaconda.backend.selectPackage("unzip")
         anaconda.backend.selectPackage("livecd-tools")
         anaconda.backend.selectPackage("firefox")

@@ -630,7 +630,7 @@ class SilvereyeBuilder(yum.YumBase):
                  'udftools', 'unzip', 'wireless-tools', 'livecd-tools',
                  'eucalyptus', 'eucalyptus-admin-tools', 'eucalyptus-cc',
                  'eucalyptus-cloud', 'eucalyptus-common-java',
-                 'eucalyptus-console', 
+                 'eucalyptus-console', 'eucalyptus-load-balancer-image', 
                  'eucalyptus-gl', 'eucalyptus-nc', 'eucalyptus-sc',
                  'eucalyptus-walrus', 'eucalyptus-release' ])
 
