@@ -151,8 +151,8 @@ class InstallClass(silvereye.InstallClass):
         # XXX: use proper constants for path names
         def copy_script(src, dest, mode=0770):
             shutil.copyfile('/tmp/updates/scripts/%s' % src,
-                            '%s%s' % (ROOT_PATH, dest))
-            os.chmod('%s%s' % (ROOT_PATH, dest), mode)
+                            '%s%s' % (anaconda.rootPath, dest))
+            os.chmod('%s%s' % (anaconda.rootPath, dest), mode)
 
         def copy_file(src, dest):
             copy_script(src, dest, mode=0644)
@@ -168,17 +168,17 @@ class InstallClass(silvereye.InstallClass):
         copy_script('register_cloud_start',
                     '/usr/local/sbin/register_cloud_start', mode=0755)
 
-        os.mkdir('%s/tmp/img' % ROOT_PATH)
+        os.mkdir('%s/tmp/img' % anaconda.rootPath)
         # EKI
         shutil.copyfile('/tmp/updates/scripts/vmlinuz-kexec',
-                        '%s/tmp/img/vmlinuz-kexec' % ROOT_PATH)
+                        '%s/tmp/img/vmlinuz-kexec' % anaconda.rootPath)
 
         # ERI
         shutil.copyfile('/tmp/updates/scripts/initramfs-kexec',
-                        '%s/tmp/img/initramfs-kexec' % ROOT_PATH)
+                        '%s/tmp/img/initramfs-kexec' % anaconda.rootPath)
 
         # Image kickstart
-        newks = open('%s/tmp/ks-centos6.cfg' % ROOT_PATH, 'w')
+        newks = open('%s/tmp/ks-centos6.cfg' % anaconda.rootPath, 'w')
         ayum = anaconda.backend.ayum
 
         for repo in ayum.repos.listEnabled():
@@ -203,7 +203,7 @@ class InstallClass(silvereye.InstallClass):
         w = anaconda.intf.progressWindow(_("Creating EMI"), 
                                      _("Creating an initial CentOS 6 EMI."), 100)
         shutil.copyfile('/tmp/eucalyptus.conf',
-                        '%s/etc/eucalyptus/eucalyptus.conf.anaconda' % ROOT_PATH)
+                        '%s/etc/eucalyptus/eucalyptus.conf.anaconda' % anaconda.rootPath)
         copy_script('eucalyptus-firstboot-final.py',
                     '/usr/share/firstboot/modules/eucalyptus-firstboot-final.py')
 
