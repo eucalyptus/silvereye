@@ -47,6 +47,15 @@ def netmask2prefix(netmask):
         prefix -= 1
     return prefix
 
+def isAddressInSubnet(ip, subnetinfo):
+    ipInt = struct.unpack('!L', socket.inet_pton(socket.AF_INET, ip))
+    if type(subnetinfo[0]) != int:
+      subnetinfo = (struct.unpack('!L', socket.inet_pton(socket.AF_INET,
+                                                         subnetinfo[0]))[0],
+                    struct.unpack('!L', socket.inet_pton(socket.AF_INET,
+                                                         subnetinfo[1]))[0])
+    return (ipInt[0] & subnetinfo[1]) == (subnetinfo[0] & subnetinfo[1])
+
 class NetworkWindow(InstallWindow):
     def getScreen(self, anaconda):
         self.intf = anaconda.intf
@@ -202,6 +211,10 @@ class NetworkWindow(InstallWindow):
                 errors.append(e.message)
             except network.IPMissing, e:
                 errors.append(e.message)
+
+            if not isAddressInSubnet(defaultgw, (ipaddr, netmask)):
+                errors.append("Gateway %s is outside the primary "
+                              "interface's subnet." % defaultgw)
 
         if len(errors):
             self.intf.messageWindow(_("Error with Network Configuration"),
