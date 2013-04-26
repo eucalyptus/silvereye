@@ -1,0 +1,30 @@
+service eucalyptus-console stop
+service eucalyptus-cloud stop
+# TODO: wait for DB to stop
+sleep 20
+service eucalyptus-cc cleanstop
+service eucalyptus-nc stop
+
+euca_conf --deregister-nodes $( grep ^NODES= /etc/eucalyptus/eucalyptus.conf | cut -d= -f2 )
+
+# Clean up certs
+find /var/lib/eucalyptus/keys/ -mindepth 1 -type d | xargs rm -rf
+rm -f /var/lib/eucalyptus/keys/*.{pem,p12}
+
+# Clean DB dirs
+rm -rf /var/{lib,run}/eucalyptus/{db,tx}/*
+
+# Clean buckets -- TODO: use walrus.storagedir property?
+rm -rf /var/lib/eucalyptus/bukkits/*
+
+# Clean volumes -- TODO: use CLUSTER01.storage.volumesdir property?
+rm -rf /var/lib/eucalyptus/volumes/*
+
+# Clean NC stuff -- TODO: use eucalyptus.conf INSTANCE_PATH value?
+rm -rf /var/lib/eucalyptus/instances/{work,cache}/*
+rm -rf /var/lib/eucalyptus/instances/{work,cache}/.blobstore
+
+rm -f /var/lib/eucalyptus/nc_state.xml
+
+# This is faststart specific
+rm -rf /root/credentials

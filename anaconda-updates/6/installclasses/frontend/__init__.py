@@ -149,33 +149,36 @@ class InstallClass(silvereye.InstallClass):
     def postAction(self, anaconda):
         silvereye.InstallClass.postAction(self, anaconda)
         # XXX: use proper constants for path names
-        shutil.copyfile('/tmp/updates/scripts/eucalyptus-frontend-config.sh',
-                        '/mnt/sysimage/usr/local/sbin/eucalyptus-frontend-config')
-        os.chmod('/mnt/sysimage/usr/local/sbin/eucalyptus-frontend-config', 0770)
+        def copy_script(src, dest, mode=0770):
+            shutil.copyfile('/tmp/updates/scripts/%s' % src,
+                            '%s%s' % (ROOT_PATH, dest))
+            os.chmod('%s%s' % (ROOT_PATH, dest), mode)
 
-        shutil.copyfile('/tmp/updates/scripts/install-unpacked-image.py',
-                        '/mnt/sysimage/usr/local/sbin/install-unpacked-image.py')
-        os.chmod('/mnt/sysimage/usr/local/sbin/install-unpacked-image.py', 0770)
+        def copy_file(src, dest):
+            copy_script(src, dest, mode=0644)
 
-        shutil.copyfile('/tmp/updates/scripts/eucalyptus-setup.init',
-                        '/mnt/sysimage/etc/init.d/eucalyptus-setup')
-        os.chmod('/mnt/sysimage/etc/init.d/eucalyptus-setup', 0770)
+        copy_script('eucalyptus-frontend-config.sh',
+                    '/usr/local/sbin/eucalyptus-frontend-config')
+        copy_script('eucalyptus-teardown',
+                    '/usr/local/sbin/eucalyptus-teardown')
+        copy_script('install-unpacked-image.py',
+                    '/usr/local/sbin/install-unpacked-image.py')
+        copy_script('eucalyptus-setup.init',
+                    '/etc/init.d/eucalyptus-setup')
+        copy_script('register_cloud_start',
+                    '/usr/local/sbin/register_cloud_start', mode=0755)
 
-        shutil.copyfile('/tmp/updates/scripts/register_cloud_start',
-                        '/mnt/sysimage/usr/local/sbin/register_cloud_start')
-        os.chmod('/mnt/sysimage/usr/local/sbin/register_cloud_start', 0755)
-
-        os.mkdir('/mnt/sysimage/tmp/img')
+        os.mkdir('%s/tmp/img' % ROOT_PATH)
         # EKI
         shutil.copyfile('/tmp/updates/scripts/vmlinuz-kexec',
-                        '/mnt/sysimage/tmp/img/vmlinuz-kexec')
+                        '%s/tmp/img/vmlinuz-kexec' % ROOT_PATH)
 
         # ERI
         shutil.copyfile('/tmp/updates/scripts/initramfs-kexec',
-                        '/mnt/sysimage/tmp/img/initramfs-kexec')
+                        '%s/tmp/img/initramfs-kexec' % ROOT_PATH)
 
         # Image kickstart
-        newks = open('/mnt/sysimage/tmp/ks-centos6.cfg', 'w')
+        newks = open('%s/tmp/ks-centos6.cfg' % ROOT_PATH, 'w')
         ayum = anaconda.backend.ayum
 
         for repo in ayum.repos.listEnabled():
@@ -187,9 +190,7 @@ class InstallClass(silvereye.InstallClass):
         newks.close()
 
         # Image creation script
-        shutil.copyfile('/tmp/updates/ami_creator.py',
-                        '/mnt/sysimage/tmp/ami_creator.py')
-        os.chmod('/mnt/sysimage/tmp/ami_creator.py', 0770)
+        copy_script('ami_creator.py', '/tmp/ami_creator.py')
 
         # XXX clean this up
         bindmount = False
@@ -202,9 +203,9 @@ class InstallClass(silvereye.InstallClass):
         w = anaconda.intf.progressWindow(_("Creating EMI"), 
                                      _("Creating an initial CentOS 6 EMI."), 100)
         shutil.copyfile('/tmp/eucalyptus.conf',
-                        '/mnt/sysimage/etc/eucalyptus/eucalyptus.conf.anaconda')
-        shutil.copyfile('/tmp/updates/scripts/eucalyptus-firstboot-final.py',
-                        '/mnt/sysimage/usr/share/firstboot/modules/eucalyptus-firstboot-final.py')
+                        '%s/etc/eucalyptus/eucalyptus.conf.anaconda' % ROOT_PATH)
+        copy_script('eucalyptus-firstboot-final.py',
+                    '/usr/share/firstboot/modules/eucalyptus-firstboot-final.py')
 
         postscriptlines ="""
 /usr/sbin/euca_conf --upgrade-conf /etc/eucalyptus/eucalyptus.conf.anaconda
