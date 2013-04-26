@@ -453,7 +453,7 @@ class SilvereyeBuilder(yum.YumBase):
           os.mkdir(scriptsDir)
       self.getKexecFiles(scriptsDir)
       self.writeMetadata(scriptsDir)
-      self.getAmiCreator(updatesdir)
+      self.getAmiCreator(scriptsDir)
       self.getSCE(updatesdir)
       shutil.copyfile(os.path.join(self.basedir, 'scripts', 'eucalyptus-nc-config.sh'),
                       os.path.join(scriptsDir, 'eucalyptus-nc-config.sh'))
