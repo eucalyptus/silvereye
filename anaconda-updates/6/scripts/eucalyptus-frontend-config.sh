@@ -229,7 +229,7 @@ if rpm -q eucalyptus-nc ; then
 fi
 
 # Fix user console CLC IP
-sed -i -e "s/^clchost:.*/clchost: $PUBLIC_IP_ADDRESS/" /etc/eucalyptus-console/console.ini
+sed -i -e "s/^clchost\s*[=:].*/clchost=$PUBLIC_IP_ADDRESS/" /etc/eucalyptus-console/console.ini
 service eucalyptus-console restart
 
 # authorize ssh for default security group
