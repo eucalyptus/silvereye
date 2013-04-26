@@ -213,6 +213,7 @@ euca-modify-property -p ${CLUSTER_NAME}.storage.blockstoragemanager=overlay
 if [ -n "$S3_URL" ]; then
   /usr/local/sbin/install-unpacked-image.py -t /tmp/img -b centos6 -s "CentOS 6 demo" -a x86_64 2>&1 | tee -a $LOGFILE
 fi
+rm -f /tmp/img/*.part.* /tmp/img/*.manifest.xml
 
 pushd /usr/share/eucalyptus-load-balancer-image
 EMI_ID=$( eustore-install-image -b elb -a x86_64 -s loadbalancer -t eucalyptus-load-balancer-image.tgz | tee -a $LOGFILE | grep ^emi- )
