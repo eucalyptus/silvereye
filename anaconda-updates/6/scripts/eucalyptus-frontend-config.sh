@@ -189,7 +189,7 @@ function get_credentials {
         unzip -o admin.zip | tee -a $LOGFILE
       fi
       if [ -f eucarc ]; then
-        source eucarc
+        source ./eucarc
       fi
       sleep 5
       retries=$(($retries - 1))
@@ -244,7 +244,7 @@ pushd /root/credentials/demo
 euca-get-credentials -a demo -u admin demo-admin.zip
 unzip demo-admin.zip
 rm demo-admin.zip
-source eucarc
+source ./eucarc
 euca-add-keypair demo > demo.private
 chmod 600 demo.private
 euca-authorize -P tcp -p 22 default
