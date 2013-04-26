@@ -250,8 +250,11 @@ chmod 600 demo.private
 euca-authorize -P tcp -p 22 default
 popd
 
-cp -r /root/credentials /etc/skel/
-mkdir /etc/skel/Desktop
+rsync -a --delete /root/credentials/ /etc/skel/credentials
+
+if [ ! -d /etc/skel/Desktop ]; then
+  mkdir /etc/skel/Desktop
+fi
 
 cat >/etc/skel/Desktop/Eucalyptus.desktop <<DESKTOPSHORTCUT
 [Desktop Entry]
