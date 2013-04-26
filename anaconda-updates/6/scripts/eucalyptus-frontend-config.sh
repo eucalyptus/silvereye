@@ -80,7 +80,7 @@ fi
 /sbin/chkconfig eucalyptus-cloud on >>$LOGFILE 2>&1
 if [ ! -f /var/run/eucalyptus/eucalyptus-cc.pid ] ; then
   retries=0
-  curl http://localhost:8443/ >/dev/null 2>&1
+  euca-describe-services | egrep -q 'SERVICE\s+eucalyptus.*ENABLED'
   while [ $? -ne 0 ] ; do
     # Wait for CLC to start
     echo "Waiting for cloud controller to finish starting"
@@ -90,7 +90,7 @@ if [ ! -f /var/run/eucalyptus/eucalyptus-cc.pid ] ; then
       fail=true
       break
     fi
-    curl http://localhost:8443/ >/dev/null 2>&1
+    euca-describe-services | egrep -q 'SERVICE\s+eucalyptus.*ENABLED'
   done
   if [ $fail ] ; then
     echo "$(date)- Cloud controller failed to start after 5 minutes. Check in /var/log/eucalyptus/startup.log" |tee -a $LOGFILE
@@ -113,7 +113,7 @@ while true; do
       fail=true
       break
     fi
-    curl http://localhost:8443/ >/dev/null 2>&1
+    euca-describe-services | egrep -q 'SERVICE\s+eucalyptus.*ENABLED'
     if [ $? -eq 0 ] ; then break; fi
 done
 if [ $fail ] ; then
