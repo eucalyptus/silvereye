@@ -121,7 +121,7 @@ class moduleClass(Module):
         self.vbox.set_spacing(5)
 
         label = gtk.Label("""
-Please enter the IP address of one or more nodes to register.  You will be prompted for the root password of each node.
+Please enter the IP addresses of one or more nodes to register, separated by spaces.  You will be prompted for the root password of each node.
 """)
         label.set_line_wrap(True)
         label.set_alignment(0.0, 0.5)
