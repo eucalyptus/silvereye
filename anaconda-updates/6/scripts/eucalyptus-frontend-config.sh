@@ -77,7 +77,7 @@ echo "$(date)- Starting services " | tee -a $LOGFILE
 if [ ! -f /var/run/eucalyptus/eucalyptus-cloud.pid ] ; then
   service eucalyptus-cloud start >> $LOGFILE 2>&1
 fi
-/sbin/chkconfig eucalyptus-cloud on >>$LOGFILE 2>&1
+  /sbin/chkconfig eucalyptus-cloud on >> $LOGFILE 2>&1
 if [ ! -f /var/run/eucalyptus/eucalyptus-cc.pid ] ; then
   retries=0
   euca-describe-services | egrep -q 'SERVICE\s+eucalyptus.*ENABLED'
@@ -215,10 +215,7 @@ if [ -n "$S3_URL" ]; then
 fi
 rm -f /tmp/img/*.part.* /tmp/img/*.manifest.xml
 
-pushd /usr/share/eucalyptus-load-balancer-image
-EMI_ID=$( eustore-install-image -b elb -a x86_64 -s loadbalancer -t eucalyptus-load-balancer-image.tgz | tee -a $LOGFILE | grep ^emi- )
-popd
-euca-modify-property -p loadbalancing.loadbalancer_emi=$EMI_ID
+euca-install-load-balancer --install-default | tee -a $LOGFILE
 
 chkconfig eucalyptus-cloud on
 
