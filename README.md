@@ -1,4 +1,4 @@
-== About Silvereye ==
+# About Silvereye
 
 Silvereye is an automated installer for Eucalyptus 3.  It is intended for
 quick cloud deployments for demos, testing, or PoCs.  It is *not*
@@ -19,10 +19,10 @@ in Eucalyptus, to avoid requirements for specific network switch hardware.
 Silvereye does not yet support any other network modes, nor does it support
 the separation of the front end's components.
 
-== Prerequisites == 
+# Prerequisites
 
 For the latest official Eucalyptus hardware requirements, please see
-http://www.eucalyptus.com/docs/3.2/ig/system_requirements.html
+<http://www.eucalyptus.com/docs/3.2/ig/system_requirements.html>
 
 For demo purposes, smaller configurations are sometimes possible, though not
 recommended.  If the target system has less than 2 GB of RAM or less than 
@@ -49,15 +49,15 @@ More documentation on Eucalyptus configuration can be found at:
 
 http://www.eucalyptus.com/eucalyptus-cloud/documentation
 
-== Downloading an official ISO ==
+# Downloading an official ISO
 
 Silvereye ISOs (rebranded as "FastStart" for official Eucalyptus releases)
-can be downloaded from http://downloads.eucalyptus.com/software/faststart/
+can be downloaded from <http://downloads.eucalyptus.com/software/faststart/>
 
 New features are being added in each release, so please reference the 
-version-specific "FastStart Guide" at http://www.eucalyptus.com/docs
+version-specific "FastStart Guide" at <http://www.eucalyptus.com/docs>
 
-== Building an ISO ==
+# Building an ISO
 
 Running the silvereye.py script will generate a CentOS 6 based ISO.  This
 build script has a large set of command-line options, all of which are
@@ -67,7 +67,7 @@ The script requires that several packages be installed on your build system:
 
 * python-argparse (This comes from EPEL, so you need to configure this
 repository first.  See 
-http://fedoraproject.org/wiki/EPEL#How_can_I_use_these_extra_packages.3F )
+<http://fedoraproject.org/wiki/EPEL#How_can_I_use_these_extra_packages.3F> )
 * ImageMagick
 * syslinux-perl
 * anaconda (this may no longer be needed)
@@ -76,7 +76,7 @@ http://fedoraproject.org/wiki/EPEL#How_can_I_use_these_extra_packages.3F )
 *NOTE*: If you don't want to build a full ISO, see the --no-iso option,
 which builds only the updates.img file.
 
-== Reporting Bugs ==
+# Reporting Bugs
 
-Please report bugs at https://eucalyptus.atlassian.net/browse/INST
+Please report bugs at <https://eucalyptus.atlassian.net/browse/INST>
 
