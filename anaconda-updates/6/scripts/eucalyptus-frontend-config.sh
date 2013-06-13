@@ -219,6 +219,12 @@ rm -f /tmp/img/*.part.* /tmp/img/*.manifest.xml
 
 euca-install-load-balancer --install-default | tee -a $LOGFILE
 
+#
+# Refresh credentials so that load balancer functions
+#
+rm -rf /root/credentials
+get_credentials
+
 chkconfig eucalyptus-cloud on
 
 if rpm -q eucalyptus-nc ; then
