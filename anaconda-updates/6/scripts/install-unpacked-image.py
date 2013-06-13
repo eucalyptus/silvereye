@@ -33,50 +33,50 @@
 #
 # Author: Andy Grimm agrimm@eucalyptus.com
 
+import glob
 import os
 import sys
+
 from euca2ools.commands.eustore.installimage import *
 
 class InstallUnpackedImage(InstallImage):
-    def bundleAll(self, dir, prefix, description, arch):
-        self.destination = dir + '/'
-        names = os.listdir(dir)
-        kernel_dir=None
-        kernel_found = False
-        kernel_id = ''
-        ramdisk_id = ''
-        id = ''
-        for path in names:
-            name = path
-            if name.startswith('vmlin'):
-                print "Bundling/uploading kernel"
-                if prefix:
-                    name = prefix+name
-                kernel_id = self.bundleFile(path, name, description, arch, 'true', None)
-                kernel_found = True
-                os.system('euca-modify-image-attribute -l -a all ' + kernel_id)
-                print kernel_id
-            elif name.startswith('initr'):
-                print "Bundling/uploading ramdisk"
-                if prefix:
-                    name = prefix+name
-                ramdisk_id = self.bundleFile(path, name, description, arch, None, 'true')
-                os.system('euca-modify-image-attribute -l -a all ' + ramdisk_id)
-                print ramdisk_id
+    def get_tarball(self, workdir):
+        return None
 
-        #now, install the image, referencing the kernel/ramdisk
-        for path in names:
-            name = os.path.basename(path)
-            if name.endswith('.img'):
-                print "Bundling/uploading image"
-                if prefix:
-                    name = prefix
-                else:
-                    name = name[:-len('.img')]
-                id = self.bundleFile(path, name, description, arch, kernel_id, ramdisk_id)
-                os.system('euca-modify-image-attribute -l -a all ' + id)
-                return id
+    def bundle_and_register_all(self, dir, tarfile):
+        names = glob.glob(os.path.join(dir, '*'))
+        kernel_id = None
+        ramdisk_id = None
+        machine_id = None
+        for name in names:
+            if os.path.basename(name).startswith('vmlin'):
+                kernel_id = self._upload_and_register(name, 'kernel', dir)
+            elif os.path.basename(name).startswith('initr'):
+                ramdisk_id = self._upload_and_register(name, 'ramdisk', dir)
+
+        for name in names: 
+            if os.path.basename(name).endswith('.img'):
+                machine_id = self._upload_and_register(name, 'machine', dir,
+                                                       kernel_id=kernel_id,
+                                                       ramdisk_id=ramdisk_id)
+        return dict(machine=machine_id, kernel=kernel_id, ramdisk=ramdisk_id)
+
+    def _upload_and_register(self, name, image_type, dir, **kwargs):
+        print "Bundling/uploading {0}".format(image_type)
+        manifest_loc = self.bundle_and_upload_image(name, image_type, dir,
+                                                    **kwargs)
+        req = RegisterImage(config=self.config,
+                service=self._InstallImage__eucalyptus,
+                ImageLocation=manifest_loc, Name=name,
+                Description=self.args.get('description'),
+                Architecture=self.args.get('architecture'))
+        response = req.main()
+        image_id = response.get('imageId')
+        if self.args['show_progress']:
+            print 'Registered {0} image {1}'.format(image_type, image_id)
+        os.system('euca-modify-image-attribute -l -a all {0}'.format(image_id))
+        return image_id
+
 
 if __name__ == '__main__':
-    cmd = InstallUnpackedImage()
-    cmd.main_cli()
+    InstallUnpackedImage.run()

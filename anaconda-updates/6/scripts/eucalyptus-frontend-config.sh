@@ -77,7 +77,7 @@ echo "$(date)- Starting services " | tee -a $LOGFILE
 if [ ! -f /var/run/eucalyptus/eucalyptus-cloud.pid ] ; then
   service eucalyptus-cloud start >> $LOGFILE 2>&1
 fi
-/sbin/chkconfig eucalyptus-cloud on >>$LOGFILE 2>&1
+  /sbin/chkconfig eucalyptus-cloud on >> $LOGFILE 2>&1
 if [ ! -f /var/run/eucalyptus/eucalyptus-cc.pid ] ; then
   retries=0
   euca-describe-services | egrep -q 'SERVICE\s+eucalyptus.*ENABLED'
@@ -211,14 +211,19 @@ get_credentials
 euca-modify-property -p ${CLUSTER_NAME}.storage.blockstoragemanager=overlay
 
 if [ -n "$S3_URL" ]; then
-  /usr/local/sbin/install-unpacked-image.py -t /tmp/img -b centos6 -s "CentOS 6 demo" -a x86_64 2>&1 | tee -a $LOGFILE
+  /usr/local/sbin/install-unpacked-image.py -d /tmp/img \
+      -t /tmp/img/vmlinuz-kexec -b centos6 -s "CentOS 6 demo" \
+      -a x86_64 --hypervisor universal 2>&1 | tee -a $LOGFILE
 fi
 rm -f /tmp/img/*.part.* /tmp/img/*.manifest.xml
 
-pushd /usr/share/eucalyptus-load-balancer-image
-EMI_ID=$( eustore-install-image -b elb -a x86_64 -s loadbalancer -t eucalyptus-load-balancer-image.tgz | tee -a $LOGFILE | grep ^emi- )
-popd
-euca-modify-property -p loadbalancing.loadbalancer_emi=$EMI_ID
+euca-install-load-balancer --install-default | tee -a $LOGFILE
+
+#
+# Refresh credentials so that load balancer functions
+#
+rm -rf /root/credentials
+get_credentials
 
 chkconfig eucalyptus-cloud on
 

@@ -552,7 +552,10 @@ class SilvereyeBuilder(yum.YumBase):
         newrepo.baseurl = baseurl
       self.repos.add(newrepo)
 
-  def setupRequiredRepos(self, repoMap={}):
+  def setupRequiredRepos(self, repoMap=None):
+    if repoMap is None:
+        repoMap = {}
+
     # Install/configure CentOS repos
     if repoMap.has_key('centos'):
       self.setupRepo('base', baseurl='%s/%s/os/%s' % (repoMap['centos'], 
@@ -565,7 +568,8 @@ class SilvereyeBuilder(yum.YumBase):
 
     # Install/configure EPEL repository
     if repoMap.has_key('epel'):
-      self.setupRepo('epel', baseurl='%s/%s/%s/' % (repoMap['epel'], self.distroversion, self.conf.yumvar['basearch']),
+      self.setupRepo('epel',
+                     baseurl=repoMap['epel'],
                      ignoreHostCfg=True)
     else:
       self.setupRepo('epel', 'epel-release',
@@ -575,9 +579,7 @@ class SilvereyeBuilder(yum.YumBase):
     # Install/configure ELRepo repository
     if repoMap.has_key('elrepo'):
       self.setupRepo('elrepo', 
-                     baseurl='%s/el%s/%s/' % (repoMap['elrepo'],
-                                            self.distroversion,
-                                            self.conf.yumvar['basearch']),
+                     baseurl=repoMap['elrepo'],
                      ignoreHostCfg=True)
     else:
       self.setupRepo('elrepo', 'elrepo-release',
@@ -588,9 +590,7 @@ class SilvereyeBuilder(yum.YumBase):
     # We should disable repos that might interfere with downloading the correct packages
     if repoMap.has_key('eucalyptus'): 
       self.setupRepo('eucalyptus',
-                     baseurl='%s/%s/%s/' % (repoMap['eucalyptus'],
-                                            self.distroversion,
-                                            self.conf.yumvar['basearch']),
+                     baseurl=repoMap['eucalyptus'],
                      ignoreHostCfg=True)
     elif self.eucaversion == "nightly":
       self.setupRepo('eucalyptus', 'eucalyptus-release',
@@ -606,13 +606,11 @@ class SilvereyeBuilder(yum.YumBase):
     # Install euca2ools repository
     if repoMap.has_key('euca2ools'):
       self.setupRepo('euca2ools',
-                     baseurl='%s/%s/%s/' % (repoMap['euca2ools'],
-                                            self.distroversion,
-                                            self.conf.yumvar['basearch']),
+                     baseurl=repoMap.get('euca2ools'),
                      ignoreHostCfg=True)
     else:
       self.setupRepo('euca2ools', 'euca2ools-release',
-                   baseurl="http://downloads.eucalyptus.com/software/euca2ools/2.1/centos/%s/%s/" % 
+                   baseurl="http://downloads.eucalyptus.com/software/euca2ools/3.0/centos/%s/%s/" % 
                    (self.distroversion, self.conf.yumvar['basearch']))
 
   def downloadPackages(self):
