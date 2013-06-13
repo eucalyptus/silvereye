@@ -211,7 +211,9 @@ get_credentials
 euca-modify-property -p ${CLUSTER_NAME}.storage.blockstoragemanager=overlay
 
 if [ -n "$S3_URL" ]; then
-  /usr/local/sbin/install-unpacked-image.py -t /tmp/img -b centos6 -s "CentOS 6 demo" -a x86_64 2>&1 | tee -a $LOGFILE
+  /usr/local/sbin/install-unpacked-image.py -d /tmp/img \
+      -t /tmp/img/vmlinuz-kexec -b centos6 -s "CentOS 6 demo" \
+      -a x86_64 --hypervisor universal 2>&1 | tee -a $LOGFILE
 fi
 rm -f /tmp/img/*.part.* /tmp/img/*.manifest.xml
 
