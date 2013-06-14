@@ -236,6 +236,7 @@ done
 # Refresh credentials so that load balancer functions
 #
 rm -rf /root/credentials
+rm -f /root/.eucarc
 get_credentials
 
 chkconfig eucalyptus-cloud on
