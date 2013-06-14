@@ -183,20 +183,20 @@ function get_credentials {
     mkdir -p /root/credentials/admin | tee -a $LOGFILE
     cd /root/credentials/admin
     while [ -z "$EUARE_URL" -o -z "$S3_URL" ] && [ $retries -gt 0 ]; do
-      if [ -e admin.zip ]; then rm admin.zip; fi
+      [ -f admin.zip ] && rm admin.zip
       euca_conf --get-credentials admin.zip 2>&1 | tee -a $LOGFILE
       if [ -s admin.zip ]; then
         unzip -o admin.zip | tee -a $LOGFILE
       fi
-      if [ -f eucarc ]; then
-        source ./eucarc
-      fi
+      . ./eucarc
       sleep 5
       retries=$(($retries - 1))
     done
 
-    euca-add-keypair admin > admin.private
+    euca-create-keypair admin > admin.private
+    chmod 600 admin.private
     cd /root
+    rm -f .eucarc
     ln -s /root/credentials/admin/eucarc .eucarc
     chmod -R go-rwx credentials | tee -a $LOGFILE
     chmod go-rwx .eucarc | tee -a $LOGFILE
@@ -236,6 +236,7 @@ done
 # Refresh credentials so that load balancer functions
 #
 rm -rf /root/credentials
+rm -f /root/.eucarc
 get_credentials
 
 chkconfig eucalyptus-cloud on
@@ -255,15 +256,15 @@ euca-authorize -P tcp -p 22 default
 
 # Create a non-admin user
 euare-accountcreate -a demo
-euare-useraddloginprofile --delegate demo -u admin -p demo
-euare-useraddkey --delegate demo -u admin
-mkdir /root/credentials/demo
+euare-useraddloginprofile --as-account demo -u admin -p demo
+euare-useraddkey --as-account demo -u admin
+mkdir -p /root/credentials/demo
 pushd /root/credentials/demo
 euca-get-credentials -a demo -u admin demo-admin.zip
-unzip demo-admin.zip
+unzip -o demo-admin.zip
 rm demo-admin.zip
-source ./eucarc
-euca-add-keypair demo > demo.private
+. ./eucarc
+euca-create-keypair demo > demo.private
 chmod 600 demo.private
 euca-authorize -P tcp -p 22 default
 popd
