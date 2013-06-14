@@ -179,6 +179,8 @@ echo
 function get_credentials {
   retries=12
   if [ ! -f /root/credentials/admin/eucarc ] ; then
+    unset EUARE_URL
+    unset S3_URL
     mkdir -p /root/credentials/admin
     cd /root/credentials/admin
     while [ -z "$EUARE_URL" -o -z "$S3_URL" ] && [ $retries -gt 0 ]; do
@@ -192,8 +194,6 @@ function get_credentials {
       retries=$(($retries - 1))
     done
 
-    euca-create-keypair admin > admin.private
-    chmod 600 admin.private
     cd /root
     rm -f .eucarc
     ln -s /root/credentials/admin/eucarc .eucarc
@@ -266,6 +266,11 @@ rm demo-admin.zip
 euca-create-keypair demo > demo.private
 chmod 600 demo.private
 euca-authorize -P tcp -p 22 default
+popd
+
+pushd /root/credentials/admin
+euca-create-keypair admin > admin.private
+chmod 600 admin.private
 popd
 
 rsync -a --delete /root/credentials/ /etc/skel/credentials
