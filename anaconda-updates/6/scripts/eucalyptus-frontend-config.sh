@@ -20,24 +20,21 @@
 #   if you need additional information or have any questions.
 #  
 
-# Set log file destination
-export LOGFILE=/var/log/eucalyptus/frontend-config.log
-
 # Generate root's SSH keys if they aren't already present
 if [ ! -f /root/.ssh/id_rsa ]
 then
-  ssh-keygen -N "" -f /root/.ssh/id_rsa >>$LOGFILE 2>&1
-  echo "$(date)- Generated root's SSH keys" | tee -a $LOGFILE
+  ssh-keygen -N "" -f /root/.ssh/id_rsa
+  echo "$(date)- Generated root's SSH keys"
 else
-  echo "$(date)- root's SSH keys already exist" | tee -a $LOGFILE
+  echo "$(date)- root's SSH keys already exist"
 fi
 SSH_HOSTNAME=`hostname`
 if ! grep "root@${SSH_HOSTNAME}" /root/.ssh/authorized_keys > /dev/null 2>&1
 then
   cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys
-  echo "$(date)- Appended root's public key to authorized_keys" | tee -a $LOGFILE
+  echo "$(date)- Appended root's public key to authorized_keys"
 else
-  echo "$(date)- root's public key already present in authorized_keys" | tee -a $LOGFILE
+  echo "$(date)- root's public key already present in authorized_keys"
 fi
 
 # populate the SSH known_hosts file
@@ -67,17 +64,17 @@ fi
 
 # Initialize the CLC if there is no existing cloud-cert.pem
 if [ ! -f /var/lib/eucalyptus/keys/cloud-cert.pem ] ; then
-  echo "$(date)- Initializing Cloud Controller " | tee -a $LOGFILE
+  echo "$(date)- Initializing Cloud Controller"
   /usr/sbin/euca_conf --initialize
 fi
 
 # Start Eucalyptus services prior to registration
 echo ""
-echo "$(date)- Starting services " | tee -a $LOGFILE
+echo "$(date)- Starting services "
 if [ ! -f /var/run/eucalyptus/eucalyptus-cloud.pid ] ; then
-  service eucalyptus-cloud start >> $LOGFILE 2>&1
+  service eucalyptus-cloud start
 fi
-  /sbin/chkconfig eucalyptus-cloud on >> $LOGFILE 2>&1
+  /sbin/chkconfig eucalyptus-cloud on
 if [ ! -f /var/run/eucalyptus/eucalyptus-cc.pid ] ; then
   retries=0
   euca-describe-services | egrep -q 'SERVICE\s+eucalyptus.*ENABLED'
@@ -93,17 +90,17 @@ if [ ! -f /var/run/eucalyptus/eucalyptus-cc.pid ] ; then
     euca-describe-services | egrep -q 'SERVICE\s+eucalyptus.*ENABLED'
   done
   if [ $fail ] ; then
-    echo "$(date)- Cloud controller failed to start after 5 minutes. Check in /var/log/eucalyptus/startup.log" |tee -a $LOGFILE
+    echo "$(date)- Cloud controller failed to start after 5 minutes. Check in /var/log/eucalyptus/startup.log"
   fi
-  service eucalyptus-cc start >> $LOGFILE 2>&1
+  service eucalyptus-cc start
 else
-  service eucalyptus-cc restart >> $LOGFILE 2>&1
+  service eucalyptus-cc restart
 fi
-/sbin/chkconfig eucalyptus-cc on >> $LOGFILE 2>&1
-echo "$(date)- Started services " | tee -a $LOGFILE
+/sbin/chkconfig eucalyptus-cc on
+echo "$(date)- Started services "
 
 # Prepare to register components
-echo "$(date)- Registering components " | tee -a $LOGFILE
+echo "$(date)- Registering components "
 retries=0
 while true; do
   echo "Waiting for cloud controller to become ready."
@@ -117,7 +114,7 @@ while true; do
     if [ $? -eq 0 ] ; then break; fi
 done
 if [ $fail ] ; then
-  echo "$(date)- Cloud controller failed to start after 5 minutes. Check in /var/log/eucalyptus/startup.log" |tee -a $LOGFILE
+  echo "$(date)- Cloud controller failed to start after 5 minutes. Check in /var/log/eucalyptus/startup.log"
 fi
 
 sleep 5
@@ -130,8 +127,8 @@ else
   export PRIVATE_IP_ADDRESS=$( ip -4 addr show $PRIVATE_INTERFACE | awk -F"[\t /]*" '/inet.*global/ { print $3 }' )
 fi
 
-echo -n "Using public IP $PUBLIC_IP_ADDRESS and private IP $PRIVATE_IP_ADDRESS to" | tee -a $LOGFILE
-echo "register components" | tee -a $LOGFILE
+echo -n "Using public IP $PUBLIC_IP_ADDRESS and private IP $PRIVATE_IP_ADDRESS to "
+echo "register components"
 
 # Register Walrus
 if [ `/usr/sbin/euca_conf --list-walruses 2>/dev/null | grep ^SERVICE |wc -l` -eq 0 ]
@@ -145,11 +142,11 @@ then
         fail=true
         break
       fi
-      /usr/sbin/euca_conf --register-walrus --partition walrus --host $PUBLIC_IP_ADDRESS --component=walrus | tee -a $LOGFILE
+      /usr/sbin/euca_conf --register-walrus --partition walrus --host $PUBLIC_IP_ADDRESS --component=walrus
       if [ $? -eq 0 ] ; then break; fi
   done
 else
-  echo "Walrus already registered. Will not re-register walrus" | tee -a $LOGFILE
+  echo "Walrus already registered. Will not re-register walrus"
 fi
 
 # Deregister previous SCs and clusters
@@ -157,49 +154,49 @@ for OLDSCIP in `/usr/sbin/euca_conf --list-scs|awk '{print $4}'`
 do
   OLDSCPARTITION=`/usr/sbin/euca_conf --list-scs|awk '{print $2}'`
   OLDSCCOMPONENT=`/usr/sbin/euca_conf --list-scs|awk '{print $3}'`
-  /usr/sbin/euca_conf --deregister-sc --partition ${OLDSCPARTITION} --host ${OLDSCIP} --component=${OLDSCCOMPONENT} >>$LOGFILE 2>&1
+  /usr/sbin/euca_conf --deregister-sc --partition ${OLDSCPARTITION} --host ${OLDSCIP} --component=${OLDSCCOMPONENT}
 done
 for OLDCCIP in `/usr/sbin/euca_conf --list-clusters|awk '{print $4}'`
 do
   OLDCCPARTITION=`/usr/sbin/euca_conf --list-clusters|awk '{print $2}'`
   OLDCCCOMPONENT=`/usr/sbin/euca_conf --list-clusters|awk '{print $3}'`
-  /usr/sbin/euca_conf --deregister-cluster --partition ${OLDCCPARTITION} --host ${OLDCCIP} --component=${OLDCCCOMPONENT} >>$LOGFILE 2>&1
+  /usr/sbin/euca_conf --deregister-cluster --partition ${OLDCCPARTITION} --host ${OLDCCIP} --component=${OLDCCCOMPONENT}
 done
 
 CLUSTER_NAME=CLUSTER01
 
 # Now register clusters and SCs
-/usr/sbin/euca_conf --register-cluster --partition $CLUSTER_NAME --host $PUBLIC_IP_ADDRESS --component=cc_01 | tee -a $LOGFILE
-/usr/sbin/euca_conf --register-sc --partition $CLUSTER_NAME --host $PRIVATE_IP_ADDRESS --component=sc_01 | tee -a $LOGFILE
+/usr/sbin/euca_conf --register-cluster --partition $CLUSTER_NAME --host $PUBLIC_IP_ADDRESS --component=cc_01
+/usr/sbin/euca_conf --register-sc --partition $CLUSTER_NAME --host $PRIVATE_IP_ADDRESS --component=sc_01
 
-echo "$(date)- Registered components " | tee -a $LOGFILE
-echo ""
+echo "$(date)- Registered components"
+echo
 }
 
 # Function to retrieve cloud admin credentials
 function get_credentials {
   retries=12
   if [ ! -f /root/credentials/admin/eucarc ] ; then
-    mkdir -p /root/credentials/admin | tee -a $LOGFILE
+    unset EUARE_URL
+    unset S3_URL
+    mkdir -p /root/credentials/admin
     cd /root/credentials/admin
     while [ -z "$EUARE_URL" -o -z "$S3_URL" ] && [ $retries -gt 0 ]; do
       [ -f admin.zip ] && rm admin.zip
-      euca_conf --get-credentials admin.zip 2>&1 | tee -a $LOGFILE
+      euca_conf --get-credentials admin.zip
       if [ -s admin.zip ]; then
-        unzip -o admin.zip | tee -a $LOGFILE
+        unzip -o admin.zip
       fi
       . ./eucarc
       sleep 5
       retries=$(($retries - 1))
     done
 
-    euca-create-keypair admin > admin.private
-    chmod 600 admin.private
     cd /root
     rm -f .eucarc
     ln -s /root/credentials/admin/eucarc .eucarc
-    chmod -R go-rwx credentials | tee -a $LOGFILE
-    chmod go-rwx .eucarc | tee -a $LOGFILE
+    chmod -R go-rwx credentials
+    chmod go-rwx .eucarc
   fi
 }
 
@@ -213,21 +210,21 @@ euca-modify-property -p ${CLUSTER_NAME}.storage.blockstoragemanager=overlay
 if [ -n "$S3_URL" ]; then
   /usr/local/sbin/install-unpacked-image.py -d /tmp/img \
       -t /tmp/img/vmlinuz-kexec -b centos6 -s "CentOS 6 demo" \
-      -a x86_64 --hypervisor universal 2>&1 | tee -a $LOGFILE
+      -a x86_64 --hypervisor universal
 fi
 rm -f /tmp/img/*.part.* /tmp/img/*.manifest.xml
 
-euca-install-load-balancer --install-default | tee -a $LOGFILE
+euca-install-load-balancer --install-default
 
 retries=30
 while ! euca-describe-services -F ENABLED | grep -q loadbalancing
 do
-    echo "$(date)- Waiting for Load Balancer service to enter ENABLED state." | tee -a $LOGFILE
+    echo "$(date)- Waiting for Load Balancer service to enter ENABLED state."
     sleep 1
     retries=$(($retries - 1))
 
     if [ $retries -eq 0 ]; then
-        echo "$(date)- Failed waiting for Load Balancer to be enabled." | tee -a $LOGFILE
+        echo "$(date)- Failed waiting for Load Balancer to be enabled."
         break
     fi
 done
@@ -243,7 +240,7 @@ chkconfig eucalyptus-cloud on
 
 if rpm -q eucalyptus-nc ; then
   NC_IP_ADDRESS=$( ip -4 addr show | awk -F"[\t /]*" "/inet.*global.*br0/ { print \$3 }" )
-  echo "Registering local NC at $NC_IP_ADDRESS" | tee -a $LOGFILE
+  echo "Registering local NC at $NC_IP_ADDRESS"
   euca_conf --register-nodes $NC_IP_ADDRESS
 fi
 
@@ -267,6 +264,11 @@ rm demo-admin.zip
 euca-create-keypair demo > demo.private
 chmod 600 demo.private
 euca-authorize -P tcp -p 22 default
+popd
+
+pushd /root/credentials/admin
+euca-create-keypair admin > admin.private
+chmod 600 admin.private
 popd
 
 rsync -a --delete /root/credentials/ /etc/skel/credentials

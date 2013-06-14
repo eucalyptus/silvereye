@@ -8,10 +8,12 @@
 # processname: eucalyptus-frontend-config
 #
 
+LOGFILE=/var/log/eucalyptus/frontend-config.log
+
 case "$1" in
   start)
     plymouth --hide-splash
-    /usr/local/sbin/eucalyptus-frontend-config
+    /usr/local/sbin/eucalyptus-frontend-config 2>&1 | tee $LOGFILE
     plymouth --show-splash
     chkconfig eucalyptus-setup off
     ;;
