@@ -219,6 +219,19 @@ rm -f /tmp/img/*.part.* /tmp/img/*.manifest.xml
 
 euca-install-load-balancer --install-default | tee -a $LOGFILE
 
+retries=30
+while ! euca-describe-services -F ENABLED | grep -q loadbalancing
+do
+    echo "$(date)- Waiting for Load Balancer service to enter ENABLED state." | tee -a $LOGFILE
+    sleep 1
+    retries=$(($retries - 1))
+
+    if [ $retries -eq 0 ]; then
+        echo "$(date)- Failed waiting for Load Balancer to be enabled." | tee -a $LOGFILE
+        break
+    fi
+done
+
 #
 # Refresh credentials so that load balancer functions
 #
