@@ -20,8 +20,6 @@
 #   if you need additional information or have any questions.
 #  
 
-set -x
-
 # Generate root's SSH keys if they aren't already present
 if [ ! -f /root/.ssh/id_rsa ]
 then
