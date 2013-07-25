@@ -253,7 +253,7 @@ euca-authorize -P tcp -p 22 default
 
 # Create a non-admin user
 euare-accountcreate -a demo
-euare-useraddloginprofile --as-account demo -u admin -p demo
+euare-useraddloginprofile --as-account demo -u admin -p password
 euare-useraddkey --as-account demo -u admin
 mkdir -p /root/credentials/demo
 pushd /root/credentials/demo
@@ -314,7 +314,7 @@ User Console URL (for managing instances, volumes, etc.):
 User Credentials:
   * Account:  demo
   * Username: admin
-  * Password: demo
+  * Password: password
 
 Admin Console URL (for managing user accounts, VM types, etc.):
     https://${PUBLIC_IP_ADDRESS}:8443
