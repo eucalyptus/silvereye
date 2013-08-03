@@ -192,11 +192,20 @@ function get_credentials {
       retries=$(($retries - 1))
     done
 
-    cd /root
-    rm -f .eucarc
-    ln -s /root/credentials/admin/eucarc .eucarc
-    chmod -R go-rwx credentials
-    chmod go-rwx .eucarc
+    . /root/credentials/admin/eucarc
+    mkdir -p /root/.euca
+    cat > /root/.euca/admin.ini <<EOF
+[global]
+default-region = localhost
+default-user = localadmin
+
+[user localadmin]
+key-id = $(echo $EC2_ACCESS_KEY)
+secret-key = $(echo $EC2_SECRET_KEY)
+certificate = $(ls -1 /root/credentials/admin/euca2-admin*-cert.pem)
+private-key = $(ls -1 /root/credentials/admin/euca2-admin*-pk.pem)
+EOF
+    chmod -R go-rwx /root/credentials /root/.euca
   fi
 }
 
@@ -252,12 +261,12 @@ service eucalyptus-console restart
 euca-authorize -P tcp -p 22 default
 
 # Create a non-admin user
-euare-accountcreate -a demo
-euare-useraddloginprofile --as-account demo -u admin -p password
-euare-useraddkey --as-account demo -u admin
+euare-accountcreate --region localadmin@localhost -a demo
+euare-useraddloginprofile --region localadmin@localhost --as-account demo -u admin -p password
+euare-useraddkey --region localadmin@localhost --as-account demo -u admin
 mkdir -p /root/credentials/demo
 pushd /root/credentials/demo
-euca-get-credentials -a demo -u admin demo-admin.zip
+euca-get-credentials --region=localadmin@localhost -a demo -u admin demo-admin.zip
 unzip -o demo-admin.zip
 rm demo-admin.zip
 . ./eucarc
@@ -266,12 +275,27 @@ chmod 600 demo.private
 euca-authorize -P tcp -p 22 default
 popd
 
+mkdir -p /root/.euca
+cat > /root/.euca/demo.ini <<EOF
+[global]
+default-region = localhost
+
+[user demoadmin]
+key-id = $(echo $EC2_ACCESS_KEY)
+secret-key = $(echo $EC2_SECRET_KEY)
+certificate = $(ls -1 /root/credentials/demo/euca2-admin*-cert.pem)
+private-key = $(ls -1 /root/credentials/demo/euca2-admin*-pk.pem)
+EOF
+
 pushd /root/credentials/admin
 euca-create-keypair admin > admin.private
 chmod 600 admin.private
 popd
 
+chmod -R go-rwx /root/credentials /root/.euca
+
 rsync -a --delete /root/credentials/ /etc/skel/credentials
+rsync -a --delete /root/.euca/ /etc/skel/.euca
 
 if [ ! -d /etc/skel/Desktop ]; then
   mkdir /etc/skel/Desktop
