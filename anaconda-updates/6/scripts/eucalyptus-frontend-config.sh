@@ -197,7 +197,9 @@ function get_credentials {
     cat > /root/.euca/admin.ini <<EOF
 [global]
 default-region = localhost
-default-user = localadmin
+
+[region localhost]
+user = localadmin
 
 [user localadmin]
 key-id = $(echo $EC2_ACCESS_KEY)
