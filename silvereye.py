@@ -776,8 +776,8 @@ class SilvereyeBuilder(yum.YumBase):
 
     if self.release:
       opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.cookieJar))
-      self.getWikiCreds(opener)
-      icon_url='https://wiki.eucalyptus-systems.com/lib/exe/fetch.php?media=brand:euc-017_favicon_fnl.jpg'
+      #self.getWikiCreds(opener)
+      icon_url='https://s3.amazonaws.com/euca-silvereye/euc-017_favicon_fnl.jpg'
       handle = opener.open(icon_url)
       open(tmp_icon, 'w').write(handle.read())
     else:
