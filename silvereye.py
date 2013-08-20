@@ -755,7 +755,7 @@ class SilvereyeBuilder(yum.YumBase):
     if self.release:
       opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.cookieJar))
       self.getWikiCreds(opener)
-      logo_url='https://wiki.eucalyptus-systems.com/lib/exe/fetch.php?cache=&media=silvereye-logo.png'
+      logo_url='https://wiki.eucalyptus-systems.com/lib/exe/fetch.php?media=silvereye-logo.png'
       handle = opener.open(logo_url)
       open(tmplogo, 'w').write(handle.read())
     else:
