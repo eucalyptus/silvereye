@@ -23,7 +23,7 @@
 # This script will create a customized CentOS x86_64 minimal installation
 # CD image that includes Eucalyptus in the installations.
 # The script should be used from an existing CentOS x86_64 installation.
-# If the EPEL, ELRepo, euca2ools and Eucalyptus package repositories are not
+# If the EPEL, ELRepo, console, euca2ools and Eucalyptus package repositories are not
 # present on the system this script will install/create them.
 
 import argparse
@@ -127,6 +127,8 @@ class SilvereyeCLI():
                         help='Set the base URL for your Eucalyptus repository')
     parser.add_argument('--euca2ools-repo',
                         help='Set the base URL for your Euca2ools repository')
+    parser.add_argument('--console-repo',
+                        help='Set the base URL for your Eucalyptus Console repository')
     parser.add_argument('--elrepo-repo',
                         help='Set the base URL for your ELRepo repository')
     parser.add_argument('--kexec-kernel-url',
@@ -157,7 +159,7 @@ class SilvereyeCLI():
 
     repoMap = dict()
     for attr in [ 'centos_repo', 'epel_repo', 'eucalyptus_repo',
-                  'euca2ools_repo', 'elrepo_repo'
+                  'euca2ools_repo', 'console_repo', 'elrepo_repo'
                 ]:
       value = getattr(parsedargs, attr)
       if value is not None:
@@ -613,6 +615,16 @@ class SilvereyeBuilder(yum.YumBase):
                    baseurl="http://downloads.eucalyptus.com/software/euca2ools/3.0/centos/%s/%s/" % 
                    (self.distroversion, self.conf.yumvar['basearch']))
 
+    # Install console repository
+    #
+    # Note that if the console repository is not specified on the command line
+    # then we will not bother adding a repository. This package is normally
+    # contained within the Eucalyptus repository.
+    if repoMap.has_key('console'):
+      self.setupRepo('console',
+                     baseurl=repoMap.get('console'),
+                     ignoreHostCfg=True)
+
   def downloadPackages(self):
     # Retrieve the RPMs for CentOS, Eucalyptus, and dependencies
     rpms = set()
@@ -672,7 +684,7 @@ class SilvereyeBuilder(yum.YumBase):
 
     yumrepodir = os.path.join(self.builddir, 'etc', 'yum.repos.d')
     mkdir(yumrepodir)
-    for repoid in ['base', 'updates', 'epel', 'elrepo', 'eucalyptus', 'euca2ools']:
+    for repoid in ['base', 'updates', 'epel', 'elrepo', 'eucalyptus', 'euca2ools', 'console']:
       if self.repos.repos.has_key(repoid):
         if hasattr(self.repos.repos[repoid], 'cfg'):
           self.repos.repos[repoid].cfg.set(repoid, 'enabled', '1')
@@ -693,7 +705,7 @@ class SilvereyeBuilder(yum.YumBase):
 
     if not os.path.exists(os.path.join(self.imgdir, 'base')):
         os.symlink(self.pkgdir, os.path.join(self.imgdir, 'base'))
-    for path in [ 'euca2ools', 'epel', 'elrepo', 'eucalyptus', 'updates' ]:
+    for path in [ 'console', 'euca2ools', 'epel', 'elrepo', 'eucalyptus', 'updates' ]:
         mkdir(os.path.join(self.imgdir, path))
 
     subprocess.call([os.path.join(self.basedir, 'scripts', 'yumdownloader'), 
@@ -725,6 +737,7 @@ class SilvereyeBuilder(yum.YumBase):
     self.logger.info("Creating repodata")
     retcode = subprocess.call(['createrepo', '-u', 'media://' + self.datestamp, '-o', self.imgdir,
                      '-g', compsfile, 
+                     '-x', 'console/*',
                      '-x', 'eucalyptus/*',
                      '-x', 'euca2ools/*',
                      '-x', 'epel/*',
@@ -737,7 +750,7 @@ class SilvereyeBuilder(yum.YumBase):
       raise Exception("creatrepo failed!!")
 
     self.logger.info("Base repo created")
-    for repo in [ 'eucalyptus', 'euca2ools', 'epel', 'elrepo', 'updates' ]:
+    for repo in [ 'console', 'eucalyptus', 'euca2ools', 'epel', 'elrepo', 'updates' ]:
         retcode = subprocess.call(['createrepo', 
                                    '-o', os.path.join(self.imgdir, repo),
                                    os.path.join(self.imgdir, repo) ],
