@@ -597,7 +597,7 @@ class SilvereyeBuilder(yum.YumBase):
     elif self.eucaversion == "nightly":
       self.setupRepo('eucalyptus', 'eucalyptus-release',
                      ignoreHostCfg=True,
-                     baseurl="http://downloads.eucalyptus.com/software/eucalyptus/nightly/3.3/centos/%s/%s/" % 
+                     baseurl="http://downloads.eucalyptus.com/software/eucalyptus/nightly/3.4/centos/%s/%s/" % 
                      (self.distroversion, self.conf.yumvar['basearch']))
     else:
       self.setupRepo('eucalyptus', 'eucalyptus-release',
