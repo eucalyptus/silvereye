@@ -698,6 +698,9 @@ class SilvereyeBuilder(yum.YumBase):
           else:
             f.write("baseurl=" + repo.baseurl[0])
           f.close()
+      elif repoid == 'console':
+          # We don't mind if there's no console repository
+          pass
       else:
         raise Exception('repo %s not configured' % repoid)
 
