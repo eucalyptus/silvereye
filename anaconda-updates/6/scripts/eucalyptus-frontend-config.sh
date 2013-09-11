@@ -200,12 +200,13 @@ default-region = localhost
 
 [region localhost]
 user = localadmin
+eustore-url = http://emis.eucalyptus.com
 
 [user localadmin]
 key-id = $(echo $EC2_ACCESS_KEY)
 secret-key = $(echo $EC2_SECRET_KEY)
-certificate = $(ls -1 /root/credentials/admin/euca2-admin*-cert.pem)
-private-key = $(ls -1 /root/credentials/admin/euca2-admin*-pk.pem)
+certificate = ~/credentials/admin/$(basename `ls -1 /root/credentials/admin/euca2-admin*-cert.pem`)
+private-key = ~/credentials/admin/$(basename `ls -1 /root/credentials/admin/euca2-admin*-pk.pem`)
 EOF
     chmod -R go-rwx /root/credentials /root/.euca
   fi
@@ -285,8 +286,8 @@ default-region = localhost
 [user demoadmin]
 key-id = $(echo $EC2_ACCESS_KEY)
 secret-key = $(echo $EC2_SECRET_KEY)
-certificate = $(ls -1 /root/credentials/demo/euca2-admin*-cert.pem)
-private-key = $(ls -1 /root/credentials/demo/euca2-admin*-pk.pem)
+certificate = ~/credentials/demo/$(basename `ls -1 /root/credentials/demo/euca2-admin*-cert.pem`)
+private-key = ~/credentials/demo/$(basename `ls -1 /root/credentials/demo/euca2-admin*-pk.pem`)
 EOF
 
 pushd /root/credentials/admin
