@@ -197,7 +197,6 @@ function get_credentials {
     cat > /root/.euca/admin.ini <<EOF
 [global]
 default-region = localhost
-eustore-url = http://emis.eucalyptus.com
 
 [region localhost]
 user = localadmin
