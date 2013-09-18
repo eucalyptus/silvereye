@@ -304,6 +304,9 @@ if [ ! -d /etc/skel/Desktop ]; then
   mkdir /etc/skel/Desktop
 fi
 
+echo ". ~/credentials/admin/eucarc" >> /root/.bashrc
+echo ". ~/credentials/admin/eucarc" >> /etc/skel/.bashrc
+
 cat >/etc/skel/Desktop/Eucalyptus.desktop <<DESKTOPSHORTCUT
 [Desktop Entry]
 Encoding=UTF-8
