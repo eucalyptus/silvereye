@@ -167,7 +167,7 @@ CLUSTER_NAME=CLUSTER01
 
 # Now register clusters and SCs
 /usr/sbin/euca_conf --register-cluster --partition $CLUSTER_NAME --host $PUBLIC_IP_ADDRESS --component=cc_01
-/usr/sbin/euca_conf --register-sc --partition $CLUSTER_NAME --host $PRIVATE_IP_ADDRESS --component=sc_01
+/usr/sbin/euca_conf --register-sc --partition $CLUSTER_NAME --host $PUBLIC_IP_ADDRESS --component=sc_01
 
 echo "$(date)- Registered components"
 echo
