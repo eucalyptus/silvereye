@@ -167,7 +167,7 @@ CLUSTER_NAME=CLUSTER01
 
 # Now register clusters and SCs
 /usr/sbin/euca_conf --register-cluster --partition $CLUSTER_NAME --host $PUBLIC_IP_ADDRESS --component=cc_01
-/usr/sbin/euca_conf --register-sc --partition $CLUSTER_NAME --host $PRIVATE_IP_ADDRESS --component=sc_01
+/usr/sbin/euca_conf --register-sc --partition $CLUSTER_NAME --host $PUBLIC_IP_ADDRESS --component=sc_01
 
 echo "$(date)- Registered components"
 echo
@@ -200,12 +200,13 @@ default-region = localhost
 
 [region localhost]
 user = localadmin
+eustore-url = http://emis.eucalyptus.com
 
 [user localadmin]
 key-id = $(echo $EC2_ACCESS_KEY)
 secret-key = $(echo $EC2_SECRET_KEY)
-certificate = $(ls -1 /root/credentials/admin/euca2-admin*-cert.pem)
-private-key = $(ls -1 /root/credentials/admin/euca2-admin*-pk.pem)
+certificate = ~/credentials/admin/$(basename `ls -1 /root/credentials/admin/euca2-admin*-cert.pem`)
+private-key = ~/credentials/admin/$(basename `ls -1 /root/credentials/admin/euca2-admin*-pk.pem`)
 EOF
     chmod -R go-rwx /root/credentials /root/.euca
   fi
@@ -285,8 +286,8 @@ default-region = localhost
 [user demoadmin]
 key-id = $(echo $EC2_ACCESS_KEY)
 secret-key = $(echo $EC2_SECRET_KEY)
-certificate = $(ls -1 /root/credentials/demo/euca2-admin*-cert.pem)
-private-key = $(ls -1 /root/credentials/demo/euca2-admin*-pk.pem)
+certificate = ~/credentials/demo/$(basename `ls -1 /root/credentials/demo/euca2-admin*-cert.pem`)
+private-key = ~/credentials/demo/$(basename `ls -1 /root/credentials/demo/euca2-admin*-pk.pem`)
 EOF
 
 pushd /root/credentials/admin
@@ -302,6 +303,9 @@ rsync -a --delete /root/.euca/ /etc/skel/.euca
 if [ ! -d /etc/skel/Desktop ]; then
   mkdir /etc/skel/Desktop
 fi
+
+echo ". ~/credentials/admin/eucarc" >> /root/.bashrc
+echo ". ~/credentials/admin/eucarc" >> /etc/skel/.bashrc
 
 cat >/etc/skel/Desktop/Eucalyptus.desktop <<DESKTOPSHORTCUT
 [Desktop Entry]
