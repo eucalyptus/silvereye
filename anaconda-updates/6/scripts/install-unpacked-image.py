@@ -65,9 +65,15 @@ class InstallUnpackedImage(InstallImage):
         print "Bundling/uploading {0}".format(image_type)
         manifest_loc = self.bundle_and_upload_image(name, image_type, dir,
                                                     **kwargs)
+
+        # Image name pad algorithm from euca2ools 3.0.2
+        image_name_pad = '{0:0>8x}-'.format(random.randrange(16**8))
+
+        image_name = image_name_pad + os.path.basename(name.split('.')[0])
+
         req = RegisterImage(config=self.config,
                 service=self._InstallImage__eucalyptus,
-                ImageLocation=manifest_loc, Name=name,
+                ImageLocation=manifest_loc, Name=image_name,
                 Description=self.args.get('description'),
                 Architecture=self.args.get('architecture'))
         response = req.main()
