@@ -257,7 +257,7 @@ class SilvereyeBuilder(yum.YumBase):
 
   @property 
   def pkgdir(self):
-    if self.distroversion == "5":
+    if self.distroversion.startswith("5"):
       return os.path.join(self.builddir, 'image', 'CentOS')
     else:
       return os.path.join(self.builddir, 'image', 'Packages')
@@ -278,7 +278,7 @@ class SilvereyeBuilder(yum.YumBase):
       self.logger.setLevel(logging.INFO)
 
   def distroCheck(self):
-    if self.distroversion in [ "5", "6" ]:
+    if self.distroversion.startswith("5") or self.distroversion.startswith("6"):
       self.logger.info("Building installation CD image for %s release %s with Eucalyptus %s." % \
                 (self.distroname, self.distroversion, self.eucaversion))
     else:
@@ -295,7 +295,7 @@ class SilvereyeBuilder(yum.YumBase):
     if not self.no_iso:
       deps.update([ 'yum-utils', 'createrepo', 'syslinux' ])
 
-      if self.distroversion == "5":
+      if self.distroversion.startswith("5"):
         deps.update([ 'anaconda-runtime' ])
       else:
         deps.update([ 'syslinux-perl', 'genisoimage', 'isomd5sum' ])
@@ -330,7 +330,7 @@ class SilvereyeBuilder(yum.YumBase):
     for x in [ os.path.basename(self.pkgdir), 'images/pxeboot', 'isolinux', 'ks', 'scripts' ]:
       mkdir(os.path.join(self.imgdir, x))
 
-    if self.distroversion == "5":
+    if self.distroversion.startswith("5"):
       mkdir(os.path.join(self.imgdir, 'images', 'xen'))
 
     self.logger.info("Created %s directory structure" % self.builddir)
@@ -347,7 +347,7 @@ class SilvereyeBuilder(yum.YumBase):
                    'isolinux/vmlinuz'
                   ])
 
-    if self.distroversion == "5":
+    if self.distroversion.startswith("5"):
       fileset.update(['isolinux/general.msg',
                       'isolinux/options.msg',
                       'isolinux/param.msg',
@@ -375,7 +375,7 @@ class SilvereyeBuilder(yum.YumBase):
                       'pxeboot/initrd.img'
                      ])
 
-    if self.distroversion == "5":
+    if self.distroversion.startswith("5"):
       imgfileset.update([
                          'README',
                          'boot.iso',
@@ -407,7 +407,7 @@ class SilvereyeBuilder(yum.YumBase):
     mkdir(os.path.join(self.imgdir, 'images'))
     updatesimg = os.path.join(self.imgdir, 'images', 'updates.img')
 
-    if self.distroversion == "5":
+    if self.distroversion.startswith("5"):
       mkdir(updatesdir)
       if os.geteuid() != 0:
         self.logger.warning("Not running as root; attempting to use sudo for mount/umount")
@@ -437,10 +437,10 @@ class SilvereyeBuilder(yum.YumBase):
       g.close()
       subprocess.call(sudo + ['/bin/umount', updatesdir ],
                       stdout=self.cmdout, stderr=self.cmdout)
-    elif self.distroversion == "6":
+    elif self.distroversion.startswith("6"):
       if os.path.exists(updatesdir):
         shutil.rmtree(updatesdir)
-      shutil.copytree(os.path.join(self.basedir, 'anaconda-updates', self.distroversion), updatesdir)
+      shutil.copytree(os.path.join(self.basedir, 'anaconda-updates', self.distroversion[0]), updatesdir)
       pixmapDir = os.path.join(updatesdir, 'pixmaps')
       mkdir(pixmapDir)
       shutil.copyfile(self.getLogo(), os.path.join(pixmapDir, 'splash.png'))
@@ -490,7 +490,7 @@ class SilvereyeBuilder(yum.YumBase):
     for ks in os.listdir(ksTmplDir):
       dest = open(os.path.join(ksdest, ks), 'w')
       for line in open(os.path.join(ksTmplDir, ks), 'r').readlines():
-        if self.distroversion == "6":
+        if self.distroversion.startswith("6"):
           if line.strip() in [ 'dbus-python', 'kernel-xen', 'libxml2-python',
                                'xen', '-kernel' ]:
             continue
@@ -585,7 +585,7 @@ class SilvereyeBuilder(yum.YumBase):
                      ignoreHostCfg=True)
     else:
       self.setupRepo('elrepo', 'elrepo-release',
-                   mirrorlist="http://elrepo.org/mirrors-elrepo.el%s" % self.distroversion)
+                   mirrorlist="http://elrepo.org/mirrors-elrepo.el%s" % self.distroversion[0])
 
     # Install/configure Eucalyptus repository
     # TODO:  Make sure the yum configuration pulls packages that match the requested release?
@@ -598,12 +598,12 @@ class SilvereyeBuilder(yum.YumBase):
       self.setupRepo('eucalyptus', 'eucalyptus-release',
                      ignoreHostCfg=True,
                      baseurl="http://downloads.eucalyptus.com/software/eucalyptus/nightly/3.4/centos/%s/%s/" % 
-                     (self.distroversion, self.conf.yumvar['basearch']))
+                     (self.distroversion[0], self.conf.yumvar['basearch']))
     else:
       self.setupRepo('eucalyptus', 'eucalyptus-release',
                      ignoreHostCfg=True,
                      baseurl="http://downloads.eucalyptus.com/software/eucalyptus/%s/centos/%s/%s/" % 
-                     (self.eucaversion, self.distroversion, self.conf.yumvar['basearch']))
+                     (self.eucaversion, self.distroversion[0], self.conf.yumvar['basearch']))
 
     # Install euca2ools repository
     if repoMap.has_key('euca2ools'):
@@ -613,7 +613,7 @@ class SilvereyeBuilder(yum.YumBase):
     else:
       self.setupRepo('euca2ools', 'euca2ools-release',
                    baseurl="http://downloads.eucalyptus.com/software/euca2ools/3.0/centos/%s/%s/" % 
-                   (self.distroversion, self.conf.yumvar['basearch']))
+                   (self.distroversion[0], self.conf.yumvar['basearch']))
 
     # Install console repository
     #
@@ -667,14 +667,14 @@ class SilvereyeBuilder(yum.YumBase):
     if self.conf.yumvar['basearch'] == 'x86_64':
       self.conf.exclude.append('*.i?86')
     self.conf.assumeyes = 1
-    if self.distroversion == "6":
-      self.conf.releasever = self.distroversion
+    if self.distroversion.startswith("6"):
+      self.conf.releasever = self.distroversion[0]
       self.conf.plugins=1
     yumconf = os.path.join(self.builddir, 'yum.conf')
     self.conf.write(open(yumconf, 'w'))
 
     # TODO: convert this to API?
-    if self.distroversion == "5":
+    if self.distroversion.startswith("6"):
       subprocess.call(['yumdownloader', 'centos-release'],
                       stdout=self.cmdout, stderr=self.cmdout)
       centospkg = glob.glob('centos-release-*')[0]
@@ -825,7 +825,7 @@ class SilvereyeBuilder(yum.YumBase):
   def createBootLogo(self):
     self.logger.info("Creating boot logo")
     # It would be nice to do all of the ImageMagick stuff with PIL, but I don't know how.
-    os.environ['ELVERSION'] = self.distroversion
+    os.environ['ELVERSION'] = self.distroversion[0]
     os.environ['BUILDDIR'] = self.builddir
     os.environ['LOGOFILE'] = self.getLogo()
 
@@ -837,7 +837,7 @@ class SilvereyeBuilder(yum.YumBase):
 
   # Replace the boot menu
   def createBootMenu(self):
-    bootcfgdir = os.path.join(self.basedir, 'isolinux', self.distroversion)
+    bootcfgdir = os.path.join(self.basedir, 'isolinux', self.distroversion[0])
     for bootfile in os.listdir(bootcfgdir):
       shutil.copyfile(os.path.join(bootcfgdir, bootfile), 
                       os.path.join(self.imgdir, 'isolinux', bootfile))
@@ -898,7 +898,7 @@ http://eucalyptus.atlassian.net/
     print ' '.join(cmd)
     subprocess.call(cmd,
                       stdout=self.cmdout, stderr=self.cmdout)
-    if self.distroversion == "5":
+    if self.distroversion.startswith("5"):
       subprocess.call(["/usr/lib/anaconda-runtime/implantisomd5", self.isofile],
                       stdout=self.cmdout, stderr=self.cmdout)
     else:
