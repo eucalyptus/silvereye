@@ -448,7 +448,7 @@ def memInstalled():
 ## Suggest the size of the swap partition that will be created.
 # @param quiet Should size information be logged?
 # @return A tuple of the minimum and maximum swap size, in megabytes.
-def swapSuggestion(quiet=0, hibernation=False):
+def swapSuggestion(quiet=0, hibernation=False, **kwargs):
     mem = memInstalled()/1024
     mem = ((mem/16)+1)*16
     if not quiet:
