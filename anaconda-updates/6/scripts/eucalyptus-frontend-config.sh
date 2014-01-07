@@ -260,6 +260,9 @@ fi
 sed -i -e "s/^clchost\s*[=:].*/clchost=$PUBLIC_IP_ADDRESS/" /etc/eucalyptus-console/console.ini
 service eucalyptus-console restart
 
+# Add tip of the day
+sed -i 's|</body>|<iframe width="0" height="0" src="https://www.eucalyptus.com/docs/tipoftheday.html" seamless="seamless" frameborder="0"></iframe></body>|' /usr/share/eucalyptus-console/static/index.html
+
 # authorize ssh for default security group
 euca-authorize -P tcp -p 22 default
 
