@@ -1,4 +1,14 @@
 <comps>
+     <group>
+        <id>eucalyptus-cloud-controller</id>
+        <name>Eucalyptus Cluster Controller</name>
+        <default>false</default>
+        <uservisible>true</uservisible>
+        <description />
+        <packagelist>
+            <packagereq type="mandatory">eucalyptus-cloud</packagereq>
+        </packagelist>
+    </group>
     <group>
         <id>eucalyptus-cluster-controller</id>
         <name>Eucalyptus Cluster Controller</name>
